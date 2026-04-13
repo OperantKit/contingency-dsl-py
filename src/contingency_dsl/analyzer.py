@@ -27,7 +27,7 @@ from .ast import (
     SecondOrder,
     Special,
 )
-from .enums import Combinator
+from .enums import Combinator, Domain
 from .errors import SemanticError
 
 
@@ -177,6 +177,8 @@ def _expand_repeats(expr: ScheduleExpr) -> ScheduleExpr:
     match expr:
         case Modifier(modifier="Repeat", value=count, inner=inner) if inner is not None and count is not None:
             n = int(count)
+            if n <= 0:
+                raise SemanticError(f"Repeat count must be positive, got {n}")
             expanded_inner = _expand_repeats(inner)
             if n == 1:
                 return expanded_inner  # Identity: Repeat(1, S) ≡ S
@@ -298,6 +300,13 @@ def _collect_warnings(
     warns: list[str] = []
 
     match expr:
+        case Atomic(schedule_type=st, time_unit=unit):
+            if st.domain in (Domain.INTERVAL, Domain.TIME) and unit is None:
+                warns.append(
+                    f"MISSING_TIME_UNIT: {st} without explicit time unit — "
+                    "consider specifying s/ms/min for procedural clarity"
+                )
+
         case LimitedHold(inner=Atomic(schedule_type=st)):
             if st.domain.value == "R":
                 warns.append(

@@ -171,7 +171,11 @@ def _lex_number_suffix(rest: str, tokens: list[Token], line: int, col: int) -> N
     if unit_part:
         if unit_part in ("s", "ms", "min"):
             tokens.append(Token(TokenType.TIME_UNIT, unit_part, line, col))
-        # else: ignore (will be caught by parser as unexpected token)
+        else:
+            raise LexError(
+                f"unrecognized time unit suffix: '{unit_part}' (expected 's', 'ms', or 'min')",
+                SourceSpan(line, col, len(unit_part)),
+            )
 
 
 def _classify_word(word: str, line: int, col: int) -> Token | None:

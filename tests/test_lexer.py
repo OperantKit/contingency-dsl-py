@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from contingency_dsl.errors import LexError
 from contingency_dsl.lexer import tokenize
 from contingency_dsl.tokens import TokenType
 
@@ -63,4 +64,44 @@ class TestLimitedHoldAlias:
             (TokenType.LH, "LH"),
             (TokenType.NUMBER, "10"),
             (TokenType.TIME_UNIT, "s"),
+        ]
+
+
+class TestUnrecognizedTimeUnitSuffix:
+    """Unrecognized time unit suffixes must raise LexError (#37-impl)."""
+
+    def test_fr5sec_raises_lex_error(self) -> None:
+        """'FR5sec' has unrecognized suffix 'sec'; must not be silently dropped."""
+        with pytest.raises(LexError, match="unrecognized time unit suffix.*sec"):
+            tokenize("FR5sec")
+
+    def test_vi60sec_raises_lex_error(self) -> None:
+        with pytest.raises(LexError, match="unrecognized time unit suffix.*sec"):
+            tokenize("VI60sec")
+
+    def test_fi30m_raises_lex_error(self) -> None:
+        """'FI30m' — 'm' is not a valid unit (use 'min' or 'ms')."""
+        with pytest.raises(LexError, match="unrecognized time unit suffix.*m"):
+            tokenize("FI30m")
+
+    def test_drl5sec_raises_lex_error(self) -> None:
+        with pytest.raises(LexError, match="unrecognized time unit suffix.*sec"):
+            tokenize("DRL5sec")
+
+    def test_valid_units_still_work(self) -> None:
+        """Confirm 's', 'ms', 'min' still tokenize correctly."""
+        assert _token_pairs("FR5s") == [
+            (TokenType.SCHEDULE_TYPE, "FR"),
+            (TokenType.NUMBER, "5"),
+            (TokenType.TIME_UNIT, "s"),
+        ]
+        assert _token_pairs("VI60ms") == [
+            (TokenType.SCHEDULE_TYPE, "VI"),
+            (TokenType.NUMBER, "60"),
+            (TokenType.TIME_UNIT, "ms"),
+        ]
+        assert _token_pairs("FI5min") == [
+            (TokenType.SCHEDULE_TYPE, "FI"),
+            (TokenType.NUMBER, "5"),
+            (TokenType.TIME_UNIT, "min"),
         ]
