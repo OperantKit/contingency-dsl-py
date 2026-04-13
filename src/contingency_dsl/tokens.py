@@ -21,6 +21,7 @@ class TokenType(Enum):
     # Keywords
     LET = auto()
     LH = auto()
+    RD = auto()  # ReinforcementDelay (program-level param_decl only)
     EXT = auto()
     CRF = auto()
     COMBINATOR = auto()  # Conc, Alt, Conj, Chain, Tand, Mult, Mix

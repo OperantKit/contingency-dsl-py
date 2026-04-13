@@ -66,10 +66,14 @@ def analyze(program: Program) -> AnalysisResult:
     schedule = _flatten_associative(schedule)
 
     # Step 4: Apply program-level LH default
+    preserved_decls: list[ParamDecl] = []
     if program.param_decls:
         for decl in program.param_decls:
             if decl.name == "LH":
                 schedule = _apply_lh_default(schedule, decl.value, decl.time_unit)
+            elif decl.name == "RD":
+                _validate_rd(decl, warns)
+                preserved_decls.append(decl)
 
     # Step 5: Generate warnings
     has_program_cod = any(
@@ -79,12 +83,36 @@ def analyze(program: Program) -> AnalysisResult:
 
     return AnalysisResult(
         program=Program(
-            param_decls=(),
+            param_decls=tuple(preserved_decls),
             bindings=(),
             schedule=schedule,
         ),
         warnings=warns,
     )
+
+
+def _validate_rd(decl: ParamDecl, warns: list[str]) -> None:
+    """Validate RD param_decl: time unit required, non-negative, large delay warning."""
+    if decl.time_unit is None:
+        raise SemanticError(
+            "RD_TIME_UNIT_REQUIRED: RD value must include a time unit (s/ms/min)"
+        )
+    if decl.value < 0:
+        raise SemanticError(
+            "RD_NEGATIVE_VALUE: RD value must be non-negative"
+        )
+    if decl.value > 30:
+        # Normalize to seconds for comparison
+        value_s = decl.value
+        if decl.time_unit == "ms":
+            value_s = decl.value / 1000
+        elif decl.time_unit == "min":
+            value_s = decl.value * 60
+        if value_s > 30:
+            warns.append(
+                "RD_LARGE_DELAY: Reinforcement delay exceeds 30s; "
+                "most published delay research uses delays <= 30s (Lattal, 2010)"
+            )
 
 
 def _expand_bindings(

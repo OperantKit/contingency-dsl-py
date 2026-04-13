@@ -198,6 +198,10 @@ def _classify_word(word: str, line: int, col: int) -> Token | None:
     # LimitedHold alias: "LimitedHold", "LimitedHold10", "LimitedHold10s", etc.
     if len(word) >= 11 and word[:11] == "LimitedHold" and (len(word) == 11 or word[11].isdigit() or word[11] == "."):
         return Token(TokenType.LH, word, line, col)
+    if word == "RD":
+        return Token(TokenType.RD, word, line, col)
+    if word == "ReinforcementDelay":
+        return Token(TokenType.RD, word, line, col)
     if word == "PR":
         return Token(TokenType.PR, word, line, col)
     if word == "Repeat":

@@ -68,6 +68,6 @@ ALL_RESERVED: frozenset[str] = (
     | COMBINATOR_KEYWORDS
     | DR_KEYWORDS
     | SPECIAL_KEYWORDS
-    | frozenset({"LH", "PR", "Repeat"})
+    | frozenset({"LH", "RD", "ReinforcementDelay", "PR", "Repeat"})
     | LOWERCASE_RESERVED
 )

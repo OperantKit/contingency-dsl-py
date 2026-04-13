@@ -28,7 +28,7 @@ def format_program(program: Program) -> str:
     parts: list[str] = []
 
     for decl in program.param_decls:
-        parts.append(f"LH = {_fmt_value(decl.value, decl.time_unit)}")
+        parts.append(f"{decl.name} = {_fmt_value(decl.value, decl.time_unit)}")
 
     for binding in program.bindings:
         parts.append(f"let {binding.name} = {format_expr(binding.value)}")

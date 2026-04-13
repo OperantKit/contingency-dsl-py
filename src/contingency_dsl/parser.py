@@ -96,11 +96,10 @@ class _Parser:
         param_decls: list[ParamDecl] = []
         bindings: list[Binding] = []
 
-        # Parse param_decls: "LH" "=" value
-        while self._at(TokenType.LH):
-            # Peek ahead: LH followed by = is a param_decl, otherwise it's
-            # part of a schedule expression (won't happen at program level,
-            # but be safe)
+        # Parse param_decls: ("LH" | "RD") "=" value
+        while self._at(TokenType.LH, TokenType.RD):
+            # Peek ahead: keyword followed by = is a param_decl, otherwise
+            # it's part of a schedule expression (LH can be postfix)
             if self._pos + 1 < len(self._tokens) and self._tokens[self._pos + 1].type == TokenType.EQUALS:
                 param_decls.append(self._parse_param_decl())
             else:
@@ -128,11 +127,16 @@ class _Parser:
         )
 
     def _parse_param_decl(self) -> ParamDecl:
-        """param_decl ::= "LH" "=" value"""
-        self._expect(TokenType.LH)
+        """param_decl ::= ("LH" | "RD") "=" value"""
+        tok = self._advance()  # consume LH or RD token
+        # Normalize alias: ReinforcementDelay -> RD, LimitedHold -> LH
+        if tok.type == TokenType.RD:
+            name = "RD"
+        else:
+            name = "LH"
         self._expect(TokenType.EQUALS)
         val, unit = self._parse_value()
-        return ParamDecl(name="LH", value=val, time_unit=unit)
+        return ParamDecl(name=name, value=val, time_unit=unit)
 
     def _parse_binding(self) -> Binding:
         """binding ::= "let" ident "=" schedule"""
