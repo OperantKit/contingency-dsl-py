@@ -12,6 +12,7 @@ from .ast import (
     Atomic,
     Binding,
     Compound,
+    CompoundParam,
     IdentifierRef,
     LimitedHold,
     Modifier,
@@ -46,9 +47,12 @@ def format_expr(expr: ScheduleExpr) -> str:
         case Special(kind=kind):
             return kind
 
-        case Compound(combinator=comb, components=components):
-            inner = ", ".join(format_expr(c) for c in components)
-            return f"{comb.value}({inner})"
+        case Compound(combinator=comb, components=components, params=params):
+            parts = [format_expr(c) for c in components]
+            if params:
+                for k, p in params.items():
+                    parts.append(f"{k}={_fmt_value(p.value, p.time_unit)}")
+            return f"{comb.value}({', '.join(parts)})"
 
         case Modifier(modifier="PR", pr_step=step, pr_start=start, pr_increment=inc):
             if step and (start is not None or inc is not None):

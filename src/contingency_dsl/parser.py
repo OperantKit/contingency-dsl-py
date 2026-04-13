@@ -18,6 +18,7 @@ from .ast import (
     Atomic,
     Binding,
     Compound,
+    CompoundParam,
     IdentifierRef,
     LimitedHold,
     Modifier,
@@ -28,7 +29,7 @@ from .ast import (
     SecondOrder,
     Special,
 )
-from .enums import Combinator, Distribution, Domain, LOWERCASE_RESERVED
+from .enums import Combinator, Distribution, Domain, KW_ARG_KEYWORDS, LOWERCASE_RESERVED
 from .errors import ParseError, SourceSpan
 from .lexer import tokenize
 from .tokens import Token, TokenType
@@ -326,7 +327,7 @@ class _Parser:
         )
 
     def _parse_compound(self) -> Compound:
-        """compound ::= combinator "(" schedule_list ")" """
+        """compound ::= combinator "(" positional_args ("," keyword_arg)* ")" """
         tok = self._expect(TokenType.COMBINATOR)
         combinator = Combinator(tok.value)
         self._expect(TokenType.LPAREN, f"{tok.value} opening paren")
@@ -340,12 +341,38 @@ class _Parser:
                 SourceSpan(tok.line, tok.col),
             )
 
+        # Parse remaining positional args and keyword args
+        params: dict[str, CompoundParam] = {}
         while self._at(TokenType.COMMA):
             self._advance()
-            components.append(self._parse_schedule())
+            # Check if next token is a keyword arg name
+            if self._at(TokenType.KW_ARG_NAME):
+                kw_tok = self._advance()
+                canonical = KW_ARG_KEYWORDS[kw_tok.value]
+                self._expect(TokenType.EQUALS)
+                val, unit = self._parse_value()
+                if canonical in params:
+                    raise ParseError(
+                        f"duplicate keyword argument '{canonical}'",
+                        SourceSpan(kw_tok.line, kw_tok.col),
+                    )
+                params[canonical] = CompoundParam(value=val, time_unit=unit)
+            else:
+                # Positional arg — must not appear after keyword args
+                if params:
+                    next_tok = self._peek()
+                    raise ParseError(
+                        f"positional argument after keyword argument in {tok.value}",
+                        SourceSpan(next_tok.line, next_tok.col),
+                    )
+                components.append(self._parse_schedule())
 
         self._expect(TokenType.RPAREN, f"{tok.value} closing paren")
-        return Compound(combinator=combinator, components=tuple(components))
+        return Compound(
+            combinator=combinator,
+            components=tuple(components),
+            params=params if params else None,
+        )
 
     def _parse_dr_mod(self) -> Modifier:
         """dr_mod ::= ("DRL" | "DRH" | "DRO") ws? value"""

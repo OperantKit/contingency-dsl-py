@@ -18,6 +18,7 @@ from .ast import (
     Atomic,
     Binding,
     Compound,
+    CompoundParam,
     IdentifierRef,
     LimitedHold,
     Modifier,
@@ -75,6 +76,9 @@ def analyze(program: Program) -> AnalysisResult:
                 _validate_rd(decl, warns)
                 preserved_decls.append(decl)
 
+    # Step 4b: Validate compound params (COD on Conc only, BO on Mult/Mix only)
+    _validate_compound_params(schedule, warns)
+
     # Step 5: Generate warnings
     has_program_cod = any(
         d.name in ("COD", "ChangeoverDelay") for d in program.param_decls
@@ -113,6 +117,41 @@ def _validate_rd(decl: ParamDecl, warns: list[str]) -> None:
                 "RD_LARGE_DELAY: Reinforcement delay exceeds 30s; "
                 "most published delay research uses delays <= 30s (Lattal, 2010)"
             )
+
+
+_CONC_ONLY_PARAMS = frozenset({"COD", "FRCO"})
+_MULT_MIX_ONLY_PARAMS = frozenset({"BO"})
+
+
+def _validate_compound_params(expr: ScheduleExpr, warns: list[str]) -> None:
+    """Validate keyword args on compound schedules (grammar §8, §13)."""
+    match expr:
+        case Compound(combinator=comb, components=components, params=params):
+            if params:
+                for k in params:
+                    if k in _CONC_ONLY_PARAMS and comb != Combinator.CONC:
+                        raise SemanticError(
+                            f"INVALID_KEYWORD_ARG: {k} is valid on Conc only, "
+                            f"not {comb.value}"
+                        )
+                    if k in _MULT_MIX_ONLY_PARAMS and comb not in (
+                        Combinator.MULT, Combinator.MIX,
+                    ):
+                        raise SemanticError(
+                            f"INVALID_KEYWORD_ARG: {k} is valid on Mult/Mix only, "
+                            f"not {comb.value}"
+                        )
+            for comp in components:
+                _validate_compound_params(comp, warns)
+
+        case LimitedHold(inner=inner):
+            _validate_compound_params(inner, warns)
+
+        case Modifier(inner=inner) if inner is not None:
+            _validate_compound_params(inner, warns)
+
+        case AnnotatedSchedule(expr=inner):
+            _validate_compound_params(inner, warns)
 
 
 def _expand_bindings(
@@ -159,13 +198,13 @@ def _substitute(
             refs.add(name)
             return env[name], refs
 
-        case Compound(combinator=comb, components=components):
+        case Compound(combinator=comb, components=components, params=params):
             new_components = []
             for comp in components:
                 new_comp, comp_refs = _substitute(comp, env)
                 new_components.append(new_comp)
                 refs.update(comp_refs)
-            return Compound(combinator=comb, components=tuple(new_components)), refs
+            return Compound(combinator=comb, components=tuple(new_components), params=params), refs
 
         case LimitedHold(hold_duration=dur, inner=inner, time_unit=unit):
             new_inner, inner_refs = _substitute(inner, env)
@@ -215,10 +254,11 @@ def _expand_repeats(expr: ScheduleExpr) -> ScheduleExpr:
                 components=tuple(expanded_inner for _ in range(n)),
             )
 
-        case Compound(combinator=comb, components=components):
+        case Compound(combinator=comb, components=components, params=params):
             return Compound(
                 combinator=comb,
                 components=tuple(_expand_repeats(c) for c in components),
+                params=params,
             )
 
         case LimitedHold(hold_duration=dur, inner=inner, time_unit=unit):
@@ -252,15 +292,15 @@ def _flatten_associative(expr: ScheduleExpr) -> ScheduleExpr:
     Tand(A, Tand(B, C)) -> Tand(A, B, C) for all seven combinators.
     """
     match expr:
-        case Compound(combinator=comb, components=components):
+        case Compound(combinator=comb, components=components, params=params):
             flat: list[ScheduleExpr] = []
             for child in components:
                 fc = _flatten_associative(child)
-                if isinstance(fc, Compound) and fc.combinator == comb:
+                if isinstance(fc, Compound) and fc.combinator == comb and not fc.params:
                     flat.extend(fc.components)
                 else:
                     flat.append(fc)
-            return Compound(combinator=comb, components=tuple(flat))
+            return Compound(combinator=comb, components=tuple(flat), params=params)
 
         case LimitedHold(hold_duration=dur, inner=inner, time_unit=unit):
             return LimitedHold(
@@ -300,12 +340,13 @@ def _apply_lh_default(
             # Already has explicit LH; don't override
             return expr
 
-        case Compound(combinator=comb, components=components):
+        case Compound(combinator=comb, components=components, params=params):
             return Compound(
                 combinator=comb,
                 components=tuple(
                     _apply_lh_default(c, hold_duration, time_unit) for c in components
                 ),
+                params=params,
             )
 
         case AnnotatedSchedule(expr=inner, annotations=anns):
@@ -345,10 +386,8 @@ def _collect_warnings(
                 _collect_warnings(expr.inner, has_program_cod=has_program_cod)
             )
 
-        case Compound(combinator=Combinator.CONC):
-            has_expr_cod = (
-                getattr(expr, "params", None) and "COD" in expr.params
-            )
+        case Compound(combinator=Combinator.CONC, params=params):
+            has_expr_cod = params is not None and "COD" in params
             if not has_expr_cod and not has_program_cod:
                 warns.append(
                     "MISSING_COD: Conc without COD specification — "

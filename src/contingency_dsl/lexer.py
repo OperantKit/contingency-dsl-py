@@ -9,6 +9,7 @@ from __future__ import annotations
 from .enums import (
     COMBINATOR_KEYWORDS,
     DR_KEYWORDS,
+    KW_ARG_KEYWORDS,
     LOWERCASE_RESERVED,
     SCHEDULE_TYPE_KEYWORDS,
     SPECIAL_KEYWORDS,
@@ -180,6 +181,11 @@ def _lex_number_suffix(rest: str, tokens: list[Token], line: int, col: int) -> N
 
 def _classify_word(word: str, line: int, col: int) -> Token | None:
     """Classify an alphabetic word into its token type."""
+    # KW_ARG_KEYWORDS must be checked before SCHEDULE_TYPE to avoid
+    # "FRCO" being split as schedule type "FR" + suffix "CO".
+    if word in KW_ARG_KEYWORDS:
+        return Token(TokenType.KW_ARG_NAME, word, line, col)
+
     # Check 2-char schedule type prefixes: word might be "FR", "FR5", "VI60s", etc.
     if len(word) >= 2 and word[:2] in SCHEDULE_TYPE_KEYWORDS:
         return Token(TokenType.SCHEDULE_TYPE, word, line, col)

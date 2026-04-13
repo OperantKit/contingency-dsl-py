@@ -25,6 +25,7 @@ class TokenType(Enum):
     EXT = auto()
     CRF = auto()
     COMBINATOR = auto()  # Conc, Alt, Conj, Chain, Tand, Mult, Mix
+    KW_ARG_NAME = auto()  # COD, ChangeoverDelay, FRCO, FixedRatioChangeover, BO, Blackout
     DR_MOD = auto()  # DRL, DRH, DRO
     PR = auto()
     REPEAT = auto()

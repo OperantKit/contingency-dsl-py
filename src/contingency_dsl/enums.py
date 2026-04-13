@@ -50,6 +50,13 @@ COMBINATOR_KEYWORDS: frozenset[str] = frozenset(c.value for c in Combinator)
 
 DR_KEYWORDS: frozenset[str] = frozenset({"DRL", "DRH", "DRO"})
 
+# Compound keyword argument names (COD, FRCO, BO and their aliases)
+KW_ARG_KEYWORDS: dict[str, str] = {
+    "COD": "COD", "ChangeoverDelay": "COD",
+    "FRCO": "FRCO", "FixedRatioChangeover": "FRCO",
+    "BO": "BO", "Blackout": "BO",
+}
+
 SPECIAL_KEYWORDS: frozenset[str] = frozenset({"EXT", "CRF"})
 
 # Lowercase reserved words (cannot be used as identifiers)
@@ -69,5 +76,6 @@ ALL_RESERVED: frozenset[str] = (
     | DR_KEYWORDS
     | SPECIAL_KEYWORDS
     | frozenset({"LH", "RD", "ReinforcementDelay", "PR", "Repeat"})
+    | frozenset(KW_ARG_KEYWORDS.keys())
     | LOWERCASE_RESERVED
 )

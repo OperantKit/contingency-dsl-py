@@ -12,6 +12,7 @@ from .ast import (
     Atomic,
     Binding,
     Compound,
+    CompoundParam,
     IdentifierRef,
     LimitedHold,
     Modifier,
@@ -52,12 +53,17 @@ def _expr_to_dict(expr: ScheduleExpr) -> dict:
         case Special(kind=kind):
             return {"type": "Special", "kind": kind}
 
-        case Compound(combinator=comb, components=components):
-            return {
+        case Compound(combinator=comb, components=components, params=params):
+            d: dict = {
                 "type": "Compound",
                 "combinator": comb.value,
                 "components": [_expr_to_dict(c) for c in components],
             }
+            if params:
+                d["params"] = {
+                    k: _compound_param_to_dict(v) for k, v in params.items()
+                }
+            return d
 
         case Modifier(modifier=mod):
             d = {"type": "Modifier", "modifier": mod}
@@ -104,6 +110,13 @@ def _expr_to_dict(expr: ScheduleExpr) -> dict:
 
         case _:
             raise ValueError(f"unknown AST node: {expr!r}")
+
+
+def _compound_param_to_dict(param: CompoundParam) -> dict:
+    d: dict = {"value": param.value}
+    if param.time_unit is not None:
+        d["time_unit"] = param.time_unit
+    return d
 
 
 def _param_decl_to_dict(decl: ParamDecl) -> dict:
@@ -155,9 +168,16 @@ def _expr_from_dict(d: dict) -> ScheduleExpr:
         return Special(kind=d["kind"])
 
     if t == "Compound":
+        params = None
+        if "params" in d:
+            params = {
+                k: CompoundParam(value=v["value"], time_unit=v.get("time_unit"))
+                for k, v in d["params"].items()
+            }
         return Compound(
             combinator=Combinator(d["combinator"]),
             components=tuple(_expr_from_dict(c) for c in d["components"]),
+            params=params,
         )
 
     if t == "Modifier":

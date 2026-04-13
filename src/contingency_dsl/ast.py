@@ -54,11 +54,20 @@ class Special:
 
 
 @dataclass(frozen=True)
+class CompoundParam:
+    """A keyword parameter on a compound schedule (COD, FRCO, BO)."""
+
+    value: float
+    time_unit: str | None = None  # None for dimensionless (e.g., FRCO)
+
+
+@dataclass(frozen=True)
 class Compound:
     """Compound schedule: combinator applied to 2+ sub-schedules."""
 
     combinator: Combinator
     components: tuple[ScheduleExpr, ...]
+    params: dict[str, CompoundParam] | None = None  # COD, FRCO, BO
 
 
 @dataclass(frozen=True)
