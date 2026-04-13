@@ -17,8 +17,11 @@ from .ast import (
     AnnotationArg,
     Atomic,
     Binding,
+    CombinatorParamValue,
     Compound,
     CompoundParam,
+    DirectionalCOD,
+    DirectionalEntry,
     IdentifierRef,
     LimitedHold,
     Modifier,
@@ -97,8 +100,8 @@ class _Parser:
         param_decls: list[ParamDecl] = []
         bindings: list[Binding] = []
 
-        # Parse param_decls: ("LH" | "RD") "=" value
-        while self._at(TokenType.LH, TokenType.RD):
+        # Parse param_decls: ("LH" | "RD" | "COD" | "FRCO" | "BO" | aliases) "=" value
+        while self._at(TokenType.LH, TokenType.RD, TokenType.KW_ARG_NAME):
             # Peek ahead: keyword followed by = is a param_decl, otherwise
             # it's part of a schedule expression (LH can be postfix)
             if self._pos + 1 < len(self._tokens) and self._tokens[self._pos + 1].type == TokenType.EQUALS:
@@ -128,11 +131,13 @@ class _Parser:
         )
 
     def _parse_param_decl(self) -> ParamDecl:
-        """param_decl ::= ("LH" | "RD") "=" value"""
-        tok = self._advance()  # consume LH or RD token
-        # Normalize alias: ReinforcementDelay -> RD, LimitedHold -> LH
+        """param_decl ::= param_name "=" value"""
+        tok = self._advance()  # consume param token
+        # Normalize aliases
         if tok.type == TokenType.RD:
             name = "RD"
+        elif tok.type == TokenType.KW_ARG_NAME:
+            name = KW_ARG_KEYWORDS[tok.value]  # COD, FRCO, BO
         else:
             name = "LH"
         self._expect(TokenType.EQUALS)
@@ -342,24 +347,48 @@ class _Parser:
             )
 
         # Parse remaining positional args and keyword args
-        params: dict[str, CompoundParam] = {}
+        params: dict[str, CombinatorParamValue] = {}
+        directional_entries: list[DirectionalEntry] = []
+        has_kw = False
         while self._at(TokenType.COMMA):
             self._advance()
             # Check if next token is a keyword arg name
             if self._at(TokenType.KW_ARG_NAME):
+                has_kw = True
                 kw_tok = self._advance()
                 canonical = KW_ARG_KEYWORDS[kw_tok.value]
-                self._expect(TokenType.EQUALS)
-                val, unit = self._parse_value()
-                if canonical in params:
-                    raise ParseError(
-                        f"duplicate keyword argument '{canonical}'",
-                        SourceSpan(kw_tok.line, kw_tok.col),
+
+                # Directional form: COD(x->y)=value
+                if self._at(TokenType.LPAREN):
+                    if canonical != "COD":
+                        raise ParseError(
+                            f"INVALID_DIRECTIONAL_KW: directional form "
+                            f"is valid for COD only, not {canonical}",
+                            SourceSpan(kw_tok.line, kw_tok.col),
+                        )
+                    self._advance()  # consume (
+                    from_ref = self._parse_dir_ref()
+                    self._expect(TokenType.ARROW, "-> in directional keyword arg")
+                    to_ref = self._parse_dir_ref()
+                    self._expect(TokenType.RPAREN, "directional keyword closing paren")
+                    self._expect(TokenType.EQUALS)
+                    val, unit = self._parse_value()
+                    directional_entries.append(
+                        DirectionalEntry(from_ref=from_ref, to_ref=to_ref, value=val, time_unit=unit)
                     )
-                params[canonical] = CompoundParam(value=val, time_unit=unit)
+                else:
+                    # Scalar form: COD=value
+                    self._expect(TokenType.EQUALS)
+                    val, unit = self._parse_value()
+                    if canonical in params:
+                        raise ParseError(
+                            f"duplicate keyword argument '{canonical}'",
+                            SourceSpan(kw_tok.line, kw_tok.col),
+                        )
+                    params[canonical] = CompoundParam(value=val, time_unit=unit)
             else:
                 # Positional arg — must not appear after keyword args
-                if params:
+                if has_kw:
                     next_tok = self._peek()
                     raise ParseError(
                         f"positional argument after keyword argument in {tok.value}",
@@ -368,10 +397,64 @@ class _Parser:
                 components.append(self._parse_schedule())
 
         self._expect(TokenType.RPAREN, f"{tok.value} closing paren")
+
+        # Resolve identifier-based dir_ref to 1-indexed integers
+        if directional_entries:
+            name_to_idx: dict[str, int] = {}
+            for i, comp in enumerate(components, start=1):
+                if isinstance(comp, IdentifierRef):
+                    name_to_idx[comp.name] = i
+
+            resolved: list[DirectionalEntry] = []
+            for entry in directional_entries:
+                from_ref = entry.from_ref
+                to_ref = entry.to_ref
+                if isinstance(from_ref, str):
+                    if from_ref not in name_to_idx:
+                        raise ParseError(
+                            f"directional ref '{from_ref}' does not match any component",
+                            SourceSpan(tok.line, tok.col),
+                        )
+                    from_ref = name_to_idx[from_ref]
+                if isinstance(to_ref, str):
+                    if to_ref not in name_to_idx:
+                        raise ParseError(
+                            f"directional ref '{to_ref}' does not match any component",
+                            SourceSpan(tok.line, tok.col),
+                        )
+                    to_ref = name_to_idx[to_ref]
+                resolved.append(DirectionalEntry(from_ref=from_ref, to_ref=to_ref, value=entry.value, time_unit=entry.time_unit))
+
+            base = params.pop("COD", None) if "COD" in params else None
+            base_param = base if isinstance(base, CompoundParam) else None
+            params["COD"] = DirectionalCOD(
+                base=base_param,
+                directional=tuple(resolved),
+            )
+
         return Compound(
             combinator=combinator,
             components=tuple(components),
             params=params if params else None,
+        )
+
+    def _parse_dir_ref(self) -> int | str:
+        """dir_ref ::= number | ident
+
+        Returns int (1-indexed) for numeric refs, or str for identifier refs.
+        Identifier refs are resolved to integer indices by the semantic analyzer.
+        """
+        tok = self._peek()
+        if tok.type == TokenType.NUMBER:
+            self._advance()
+            return int(float(tok.value))
+        if tok.type == TokenType.IDENTIFIER:
+            self._advance()
+            return tok.value
+        raise ParseError(
+            f"expected number or identifier in directional reference, "
+            f"got {tok.type.name} '{tok.value}'",
+            SourceSpan(tok.line, tok.col),
         )
 
     def _parse_dr_mod(self) -> Modifier:

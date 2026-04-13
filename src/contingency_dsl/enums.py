@@ -29,7 +29,7 @@ class Domain(Enum):
 
 
 class Combinator(Enum):
-    """Compound schedule combinators (7 total)."""
+    """Compound schedule combinators (8 total)."""
 
     CONC = "Conc"  # Parallel, independent
     ALT = "Alt"  # Parallel, OR
@@ -38,6 +38,7 @@ class Combinator(Enum):
     TAND = "Tand"  # Sequential, undiscriminated
     MULT = "Mult"  # Alternating, discriminated
     MIX = "Mix"  # Alternating, undiscriminated
+    OVERLAY = "Overlay"  # Punishment overlay (Azrin & Holz, 1966)
 
 
 # Schedule type keywords: all 3x3 combinations

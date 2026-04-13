@@ -55,10 +55,39 @@ class Special:
 
 @dataclass(frozen=True)
 class CompoundParam:
-    """A keyword parameter on a compound schedule (COD, FRCO, BO)."""
+    """A scalar keyword parameter on a compound schedule (COD, FRCO, BO)."""
 
     value: float
     time_unit: str | None = None  # None for dimensionless (e.g., FRCO)
+
+
+@dataclass(frozen=True)
+class DirectionalEntry:
+    """A single direction-specific override: COD(from->to)=value.
+
+    from_ref/to_ref are int (1-indexed) when parsed from numeric indices,
+    or str when parsed from identifiers (resolved to int by the analyzer).
+    """
+
+    from_ref: int | str  # 1-indexed int, or identifier name (pre-resolution)
+    to_ref: int | str  # 1-indexed int, or identifier name (pre-resolution)
+    value: float
+    time_unit: str | None = None
+
+
+@dataclass(frozen=True)
+class DirectionalCOD:
+    """Directional COD: optional base + direction-specific overrides.
+
+    Pliskoff (1971); Williams & Bell (1999).
+    """
+
+    base: CompoundParam | None = None
+    directional: tuple[DirectionalEntry, ...] = ()
+
+
+# Union for compound schedule parameter values
+CombinatorParamValue = CompoundParam | DirectionalCOD
 
 
 @dataclass(frozen=True)
@@ -67,7 +96,7 @@ class Compound:
 
     combinator: Combinator
     components: tuple[ScheduleExpr, ...]
-    params: dict[str, CompoundParam] | None = None  # COD, FRCO, BO
+    params: dict[str, CombinatorParamValue] | None = None  # COD, FRCO, BO
 
 
 @dataclass(frozen=True)

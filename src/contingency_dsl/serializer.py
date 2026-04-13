@@ -11,8 +11,11 @@ from .ast import (
     AnnotationArg,
     Atomic,
     Binding,
+    CombinatorParamValue,
     Compound,
     CompoundParam,
+    DirectionalCOD,
+    DirectionalEntry,
     IdentifierRef,
     LimitedHold,
     Modifier,
@@ -61,7 +64,7 @@ def _expr_to_dict(expr: ScheduleExpr) -> dict:
             }
             if params:
                 d["params"] = {
-                    k: _compound_param_to_dict(v) for k, v in params.items()
+                    k: _param_value_to_dict(v) for k, v in params.items()
                 }
             return d
 
@@ -112,10 +115,31 @@ def _expr_to_dict(expr: ScheduleExpr) -> dict:
             raise ValueError(f"unknown AST node: {expr!r}")
 
 
+def _param_value_to_dict(param: CombinatorParamValue) -> dict:
+    if isinstance(param, DirectionalCOD):
+        d: dict = {}
+        if param.base is not None:
+            d["base"] = _compound_param_to_dict(param.base)
+        d["directional"] = [_directional_entry_to_dict(e) for e in param.directional]
+        return d
+    return _compound_param_to_dict(param)
+
+
 def _compound_param_to_dict(param: CompoundParam) -> dict:
     d: dict = {"value": param.value}
     if param.time_unit is not None:
         d["time_unit"] = param.time_unit
+    return d
+
+
+def _directional_entry_to_dict(entry: DirectionalEntry) -> dict:
+    d: dict = {
+        "from": entry.from_ref if isinstance(entry.from_ref, int) else entry.from_ref,
+        "to": entry.to_ref if isinstance(entry.to_ref, int) else entry.to_ref,
+        "value": entry.value,
+    }
+    if entry.time_unit is not None:
+        d["time_unit"] = entry.time_unit
     return d
 
 
@@ -170,10 +194,17 @@ def _expr_from_dict(d: dict) -> ScheduleExpr:
     if t == "Compound":
         params = None
         if "params" in d:
-            params = {
-                k: CompoundParam(value=v["value"], time_unit=v.get("time_unit"))
-                for k, v in d["params"].items()
-            }
+            params = {}
+            for k, v in d["params"].items():
+                if "directional" in v:
+                    base = CompoundParam(value=v["base"]["value"], time_unit=v["base"].get("time_unit")) if "base" in v else None
+                    entries = tuple(
+                        DirectionalEntry(from_ref=e["from"], to_ref=e["to"], value=e["value"], time_unit=e.get("time_unit"))
+                        for e in v["directional"]
+                    )
+                    params[k] = DirectionalCOD(base=base, directional=entries)
+                else:
+                    params[k] = CompoundParam(value=v["value"], time_unit=v.get("time_unit"))
         return Compound(
             combinator=Combinator(d["combinator"]),
             components=tuple(_expr_from_dict(c) for c in d["components"]),

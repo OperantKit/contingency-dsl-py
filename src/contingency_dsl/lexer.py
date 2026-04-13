@@ -33,7 +33,13 @@ def tokenize(source: str) -> list[Token]:
                 col += 1
                 continue
 
-            # Line comment
+            # Arrow: -> (directional keyword arg)
+            if ch == "-" and col + 1 < len(line_text) and line_text[col + 1] == ">":
+                tokens.append(Token(TokenType.ARROW, "->", line_num, col + 1))
+                col += 2
+                continue
+
+            # Line comment: --
             if ch == "-" and col + 1 < len(line_text) and line_text[col + 1] == "-":
                 break  # skip rest of line
 

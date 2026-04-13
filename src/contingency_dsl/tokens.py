@@ -18,6 +18,9 @@ class TokenType(Enum):
     RPAREN = auto()
     COMMA = auto()
     EQUALS = auto()
+    ARROW = auto()  # -> (directional keyword arg: COD(1->2)=2s)
+    LBRACKET = auto()  # [ (reserved for future use)
+    RBRACKET = auto()  # ] (reserved for future use)
     # Keywords
     LET = auto()
     LH = auto()

@@ -19,6 +19,7 @@ from .ast import (
     Binding,
     Compound,
     CompoundParam,
+    DirectionalCOD,
     IdentifierRef,
     LimitedHold,
     Modifier,
@@ -123,12 +124,62 @@ _CONC_ONLY_PARAMS = frozenset({"COD", "FRCO"})
 _MULT_MIX_ONLY_PARAMS = frozenset({"BO"})
 
 
+def _validate_directional_cod(
+    cod: DirectionalCOD, n_components: int, warns: list[str]
+) -> None:
+    """Validate directional COD entries (grammar §50-59)."""
+    seen_pairs: set[tuple[int, int]] = set()
+
+    for entry in cod.directional:
+        f = entry.from_ref
+        t = entry.to_ref
+
+        # §51: index range check
+        if isinstance(f, int) and (f < 1 or f > n_components):
+            raise SemanticError(
+                f"DIRECTIONAL_INDEX_OUT_OF_RANGE: from={f} "
+                f"but Conc has {n_components} components"
+            )
+        if isinstance(t, int) and (t < 1 or t > n_components):
+            raise SemanticError(
+                f"DIRECTIONAL_INDEX_OUT_OF_RANGE: to={t} "
+                f"but Conc has {n_components} components"
+            )
+
+        # §53: self-reference
+        if f == t:
+            raise SemanticError(
+                f"DIRECTIONAL_SELF_REFERENCE: COD({f}->{t}) — "
+                "a component cannot have a COD for switching to itself"
+            )
+
+        # §54: duplicate direction pair
+        pair = (f, t) if isinstance(f, int) and isinstance(t, int) else (f, t)
+        if pair in seen_pairs:
+            raise SemanticError(
+                f"DUPLICATE_DIRECTIONAL_KW: COD({f}->{t}) specified twice"
+            )
+        seen_pairs.add(pair)
+
+    # §58: all directions identical → redundant
+    if len(cod.directional) >= 2 and cod.base is None:
+        values = [(e.value, e.time_unit) for e in cod.directional]
+        if len(set(values)) == 1:
+            # Check if all n*(n-1) directions are covered
+            n_possible = n_components * (n_components - 1)
+            if len(cod.directional) == n_possible:
+                warns.append(
+                    "REDUNDANT_DIRECTIONAL_COD: all directional COD values "
+                    "are identical — consider using scalar COD instead"
+                )
+
+
 def _validate_compound_params(expr: ScheduleExpr, warns: list[str]) -> None:
-    """Validate keyword args on compound schedules (grammar §8, §13)."""
+    """Validate keyword args on compound schedules (grammar §8, §13, §50-59)."""
     match expr:
         case Compound(combinator=comb, components=components, params=params):
             if params:
-                for k in params:
+                for k, v in params.items():
                     if k in _CONC_ONLY_PARAMS and comb != Combinator.CONC:
                         raise SemanticError(
                             f"INVALID_KEYWORD_ARG: {k} is valid on Conc only, "
@@ -141,6 +192,26 @@ def _validate_compound_params(expr: ScheduleExpr, warns: list[str]) -> None:
                             f"INVALID_KEYWORD_ARG: {k} is valid on Mult/Mix only, "
                             f"not {comb.value}"
                         )
+                    # Directional form validation (§50-59)
+                    if isinstance(v, DirectionalCOD):
+                        if k != "COD":
+                            raise SemanticError(
+                                f"INVALID_DIRECTIONAL_KW: directional form is "
+                                f"valid for COD only, not {k}"
+                            )
+                        _validate_directional_cod(v, len(components), warns)
+            # §35-36: Overlay requires exactly 2 components, no keyword args
+            if comb == Combinator.OVERLAY:
+                if len(components) != 2:
+                    raise SemanticError(
+                        f"OVERLAY_REQUIRES_TWO: Overlay requires exactly 2 "
+                        f"components (baseline + punisher), got {len(components)}"
+                    )
+                if params:
+                    raise SemanticError(
+                        "INVALID_KEYWORD_ARG: Overlay does not accept "
+                        "keyword arguments in v1.x"
+                    )
             for comp in components:
                 _validate_compound_params(comp, warns)
 
