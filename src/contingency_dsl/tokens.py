@@ -19,8 +19,9 @@ class TokenType(Enum):
     COMMA = auto()
     EQUALS = auto()
     ARROW = auto()  # -> (directional keyword arg: COD(1->2)=2s)
-    LBRACKET = auto()  # [ (reserved for future use)
-    RBRACKET = auto()  # ] (reserved for future use)
+    LBRACKET = auto()  # [ (list literal for respondent cs_list)
+    RBRACKET = auto()  # ] (list literal for respondent cs_list)
+    DOT = auto()  # . (dotted primitive: Pair.ForwardDelay)
     # Keywords
     LET = auto()
     LH = auto()

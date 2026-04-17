@@ -64,6 +64,20 @@ def tokenize(source: str) -> list[Token]:
                 tokens.append(Token(TokenType.AT, "@", line_num, col + 1))
                 col += 1
                 continue
+            if ch == "[":
+                tokens.append(Token(TokenType.LBRACKET, "[", line_num, col + 1))
+                col += 1
+                continue
+            if ch == "]":
+                tokens.append(Token(TokenType.RBRACKET, "]", line_num, col + 1))
+                col += 1
+                continue
+            # Dot: used only between identifiers (e.g. Pair.ForwardDelay).
+            # Leading '.' for decimal numbers is handled by the number branch.
+            if ch == "." and col + 1 < len(line_text) and line_text[col + 1].isalpha():
+                tokens.append(Token(TokenType.DOT, ".", line_num, col + 1))
+                col += 1
+                continue
 
             # String literal: "..."
             if ch == '"':
