@@ -35,8 +35,9 @@ def _load_test_cases(filename: str) -> list[dict]:
 def _collect_conformance_cases():
     """Collect all (file, case) pairs for parametrize.
 
-    Searches subdirectories (core/, annotations/, core-stateful/, core-trial-based/)
-    recursively. representations/ is excluded — handled by test_t_tau_conversion.py.
+    Searches subdirectories (foundations/, operant/, operant/stateful/, operant/trial-based/,
+    respondent/, composed/, experiment/, annotations/) recursively.
+    representations/ is excluded — handled by test_t_tau_conversion.py.
     """
     cases = []
     if not CONFORMANCE_DIR.exists():

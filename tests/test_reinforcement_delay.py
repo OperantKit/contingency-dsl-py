@@ -1,7 +1,7 @@
 """Tests for RD (ReinforcementDelay) param_decl support.
 
 RD is a program-level parameter only (no expression-level syntax).
-Per-schedule delays use Tand(S, FT d) — see conformance/core/reinforcement_delay.json.
+Per-schedule delays use Tand(S, FT d) — see conformance/operant/reinforcement_delay.json.
 """
 
 from __future__ import annotations
