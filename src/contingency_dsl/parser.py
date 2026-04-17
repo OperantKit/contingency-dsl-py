@@ -35,6 +35,7 @@ from .ast import (
 from .enums import Combinator, Distribution, Domain, KW_ARG_KEYWORDS, LOWERCASE_RESERVED
 from .errors import ParseError, SourceSpan
 from .lexer import tokenize
+from .respondent_parser import RESPONDENT_PRIMITIVE_NAMES, try_parse_respondent
 from .tokens import Token, TokenType
 
 if TYPE_CHECKING:
@@ -291,8 +292,12 @@ class _Parser:
             self._advance()
             return Special(kind="CRF")
 
-        # Identifier reference
+        # Identifier reference or respondent Tier A primitive dispatch.
         if tok.type == TokenType.IDENTIFIER:
+            if tok.value in RESPONDENT_PRIMITIVE_NAMES:
+                respondent = try_parse_respondent(self)
+                if respondent is not None:
+                    return respondent
             self._advance()
             return IdentifierRef(name=tok.value)
 
