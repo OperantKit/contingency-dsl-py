@@ -27,6 +27,24 @@ from .extensions import ExtensionModule, ExtensionRegistry
 from .analyzer import AnalysisResult, analyze
 from .parser import parse
 from .printer import format_expr, format_program
+from .respondent import (
+    CSOnly,
+    Compound as RespondentCompound,
+    Contingency,
+    Differential,
+    Duration,
+    ExplicitlyUnpaired,
+    Extinction,
+    ITI,
+    PairBackward,
+    PairForwardDelay,
+    PairForwardTrace,
+    PairSimultaneous,
+    RespondentExpr,
+    Serial,
+    TrulyRandom,
+    USOnly,
+)
 from .serializer import from_dict, to_dict
 
 __all__ = [
@@ -70,4 +88,21 @@ __all__ = [
     # Serializer
     "to_dict",
     "from_dict",
+    # Respondent Tier A primitives
+    "CSOnly",
+    "RespondentCompound",
+    "Contingency",
+    "Differential",
+    "Duration",
+    "ExplicitlyUnpaired",
+    "Extinction",
+    "ITI",
+    "PairBackward",
+    "PairForwardDelay",
+    "PairForwardTrace",
+    "PairSimultaneous",
+    "RespondentExpr",
+    "Serial",
+    "TrulyRandom",
+    "USOnly",
 ]
