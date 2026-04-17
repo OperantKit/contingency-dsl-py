@@ -27,6 +27,23 @@ from .ast import (
     Special,
 )
 from .enums import Combinator, Distribution, Domain
+from .respondent import (
+    CSOnly,
+    Compound as RespondentCompound,
+    Contingency,
+    Differential,
+    Duration,
+    ExplicitlyUnpaired,
+    Extinction,
+    ITI,
+    PairBackward,
+    PairForwardDelay,
+    PairForwardTrace,
+    PairSimultaneous,
+    Serial,
+    TrulyRandom,
+    USOnly,
+)
 
 
 def to_dict(program: Program) -> dict:
@@ -111,8 +128,102 @@ def _expr_to_dict(expr: ScheduleExpr) -> dict:
                 "annotations": [_annotation_to_dict(a) for a in anns],
             }
 
+        case PairForwardDelay(cs=cs, us=us, isi=isi, cs_duration=csd):
+            return {
+                "type": "PairForwardDelay",
+                "cs": cs,
+                "us": us,
+                "isi": _duration_to_dict(isi),
+                "cs_duration": _duration_to_dict(csd),
+            }
+
+        case PairForwardTrace(cs=cs, us=us, trace_interval=ti, cs_duration=csd):
+            d = {
+                "type": "PairForwardTrace",
+                "cs": cs,
+                "us": us,
+                "trace_interval": _duration_to_dict(ti),
+            }
+            if csd is not None:
+                d["cs_duration"] = _duration_to_dict(csd)
+            return d
+
+        case PairSimultaneous(cs=cs, us=us):
+            return {"type": "PairSimultaneous", "cs": cs, "us": us}
+
+        case PairBackward(us=us, cs=cs, isi=isi):
+            return {
+                "type": "PairBackward",
+                "us": us,
+                "cs": cs,
+                "isi": _duration_to_dict(isi),
+            }
+
+        case Extinction(cs=cs):
+            return {"type": "Extinction", "cs": cs}
+
+        case CSOnly(cs=cs, trials=trials):
+            return {"type": "CSOnly", "cs": cs, "trials": trials}
+
+        case USOnly(us=us, trials=trials):
+            return {"type": "USOnly", "us": us, "trials": trials}
+
+        case Contingency(p_us_given_cs=p1, p_us_given_no_cs=p2):
+            return {
+                "type": "Contingency",
+                "p_us_given_cs": p1,
+                "p_us_given_no_cs": p2,
+            }
+
+        case TrulyRandom(cs=cs, us=us, p=p):
+            d = {"type": "TrulyRandom", "cs": cs, "us": us}
+            if p is not None:
+                d["p"] = p
+            return d
+
+        case ExplicitlyUnpaired(cs=cs, us=us, min_separation=ms):
+            d = {"type": "ExplicitlyUnpaired", "cs": cs, "us": us}
+            if ms is not None:
+                d["min_separation"] = _duration_to_dict(ms)
+            return d
+
+        case RespondentCompound(cs_list=cs_list, mode=mode):
+            return {
+                "type": "Compound",
+                "cs_list": list(cs_list),
+                "mode": mode,
+            }
+
+        case Serial(cs_list=cs_list, isi=isi):
+            return {
+                "type": "Serial",
+                "cs_list": list(cs_list),
+                "isi": _duration_to_dict(isi),
+            }
+
+        case ITI(distribution=dist, mean=mean):
+            return {
+                "type": "ITI",
+                "distribution": dist,
+                "mean": _duration_to_dict(mean),
+            }
+
+        case Differential(cs_positive=pos, cs_negative=neg, us=us):
+            d = {
+                "type": "Differential",
+                "cs_positive": pos,
+                "cs_negative": neg,
+            }
+            if us is not None:
+                d["us"] = us
+            return d
+
         case _:
             raise ValueError(f"unknown AST node: {expr!r}")
+
+
+def _duration_to_dict(dur: Duration) -> dict:
+    return {"value": dur.value, "unit": dur.unit}
 
 
 def _param_value_to_dict(param: CombinatorParamValue) -> dict:
@@ -192,6 +303,12 @@ def _expr_from_dict(d: dict) -> ScheduleExpr:
         return Special(kind=d["kind"])
 
     if t == "Compound":
+        # Disambiguate operant vs respondent Compound by payload shape.
+        if "cs_list" in d:
+            return RespondentCompound(
+                cs_list=tuple(d["cs_list"]),
+                mode=d.get("mode", "Simultaneous"),
+            )
         params = None
         if "params" in d:
             params = {}
@@ -239,6 +356,76 @@ def _expr_from_dict(d: dict) -> ScheduleExpr:
     if t == "IdentifierRef":
         return IdentifierRef(name=d["name"])
 
+    if t == "PairForwardDelay":
+        return PairForwardDelay(
+            cs=d["cs"],
+            us=d["us"],
+            isi=_duration_from_dict(d["isi"]),
+            cs_duration=_duration_from_dict(d["cs_duration"]),
+        )
+
+    if t == "PairForwardTrace":
+        return PairForwardTrace(
+            cs=d["cs"],
+            us=d["us"],
+            trace_interval=_duration_from_dict(d["trace_interval"]),
+            cs_duration=_duration_from_dict(d["cs_duration"]) if "cs_duration" in d else None,
+        )
+
+    if t == "PairSimultaneous":
+        return PairSimultaneous(cs=d["cs"], us=d["us"])
+
+    if t == "PairBackward":
+        return PairBackward(us=d["us"], cs=d["cs"], isi=_duration_from_dict(d["isi"]))
+
+    if t == "Extinction":
+        return Extinction(cs=d["cs"])
+
+    if t == "CSOnly":
+        return CSOnly(cs=d["cs"], trials=int(d["trials"]))
+
+    if t == "USOnly":
+        return USOnly(us=d["us"], trials=int(d["trials"]))
+
+    if t == "Contingency":
+        return Contingency(
+            p_us_given_cs=float(d["p_us_given_cs"]),
+            p_us_given_no_cs=float(d["p_us_given_no_cs"]),
+        )
+
+    if t == "TrulyRandom":
+        return TrulyRandom(
+            cs=d["cs"],
+            us=d["us"],
+            p=float(d["p"]) if "p" in d else None,
+        )
+
+    if t == "ExplicitlyUnpaired":
+        return ExplicitlyUnpaired(
+            cs=d["cs"],
+            us=d["us"],
+            min_separation=_duration_from_dict(d["min_separation"]) if "min_separation" in d else None,
+        )
+
+    if t == "Serial":
+        return Serial(
+            cs_list=tuple(d["cs_list"]),
+            isi=_duration_from_dict(d["isi"]),
+        )
+
+    if t == "ITI":
+        return ITI(
+            distribution=d["distribution"],
+            mean=_duration_from_dict(d["mean"]),
+        )
+
+    if t == "Differential":
+        return Differential(
+            cs_positive=d["cs_positive"],
+            cs_negative=d["cs_negative"],
+            us=d.get("us"),
+        )
+
     if t == "AnnotatedSchedule":
         return AnnotatedSchedule(
             expr=_expr_from_dict(d["expr"]),
@@ -259,6 +446,10 @@ def _expr_from_dict(d: dict) -> ScheduleExpr:
 
 def _param_decl_from_dict(d: dict) -> ParamDecl:
     return ParamDecl(name=d["name"], value=d["value"], time_unit=d.get("time_unit"))
+
+
+def _duration_from_dict(d: dict) -> Duration:
+    return Duration(value=float(d["value"]), unit=d["unit"])
 
 
 def _binding_from_dict(d: dict) -> Binding:

@@ -22,6 +22,23 @@ from .ast import (
     SecondOrder,
     Special,
 )
+from .respondent import (
+    CSOnly,
+    Compound as RespondentCompound,
+    Contingency,
+    Differential,
+    Duration,
+    ExplicitlyUnpaired,
+    Extinction,
+    ITI,
+    PairBackward,
+    PairForwardDelay,
+    PairForwardTrace,
+    PairSimultaneous,
+    Serial,
+    TrulyRandom,
+    USOnly,
+)
 
 
 def format_program(program: Program) -> str:
@@ -87,8 +104,70 @@ def format_expr(expr: ScheduleExpr) -> str:
                 parts.append(_fmt_annotation(ann))
             return " ".join(parts)
 
+        case PairForwardDelay(cs=cs, us=us, isi=isi, cs_duration=csd):
+            return (
+                f"Pair.ForwardDelay({cs}, {us}, "
+                f"isi={_fmt_duration(isi)}, cs_duration={_fmt_duration(csd)})"
+            )
+
+        case PairForwardTrace(cs=cs, us=us, trace_interval=ti, cs_duration=csd):
+            inner = f"Pair.ForwardTrace({cs}, {us}, trace_interval={_fmt_duration(ti)}"
+            if csd is not None:
+                inner += f", cs_duration={_fmt_duration(csd)}"
+            return inner + ")"
+
+        case PairSimultaneous(cs=cs, us=us):
+            return f"Pair.Simultaneous({cs}, {us})"
+
+        case PairBackward(us=us, cs=cs, isi=isi):
+            return f"Pair.Backward({us}, {cs}, isi={_fmt_duration(isi)})"
+
+        case Extinction(cs=cs):
+            return f"Extinction({cs})"
+
+        case CSOnly(cs=cs, trials=trials):
+            return f"CSOnly({cs}, trials={trials})"
+
+        case USOnly(us=us, trials=trials):
+            return f"USOnly({us}, trials={trials})"
+
+        case Contingency(p_us_given_cs=p1, p_us_given_no_cs=p2):
+            return f"Contingency({_fmt_num(p1)}, {_fmt_num(p2)})"
+
+        case TrulyRandom(cs=cs, us=us, p=p):
+            if p is None:
+                return f"TrulyRandom({cs}, {us})"
+            return f"TrulyRandom({cs}, {us}, p={_fmt_num(p)})"
+
+        case ExplicitlyUnpaired(cs=cs, us=us, min_separation=ms):
+            if ms is None:
+                return f"ExplicitlyUnpaired({cs}, {us})"
+            return f"ExplicitlyUnpaired({cs}, {us}, min_separation={_fmt_duration(ms)})"
+
+        case RespondentCompound(cs_list=cs_list, mode=mode):
+            items = ", ".join(cs_list)
+            if mode == "Simultaneous":
+                return f"Compound(cs_list=[{items}])"
+            return f"Compound(cs_list=[{items}], mode={mode})"
+
+        case Serial(cs_list=cs_list, isi=isi):
+            items = ", ".join(cs_list)
+            return f"Serial(cs_list=[{items}], isi={_fmt_duration(isi)})"
+
+        case ITI(distribution=dist, mean=mean):
+            return f"ITI({dist}, mean={_fmt_duration(mean)})"
+
+        case Differential(cs_positive=pos, cs_negative=neg, us=us):
+            if us is None:
+                return f"Differential(cs_positive={pos}, cs_negative={neg})"
+            return f"Differential(cs_positive={pos}, cs_negative={neg}, us={us})"
+
         case _:
             return repr(expr)
+
+
+def _fmt_duration(dur: Duration) -> str:
+    return f"{_fmt_num(dur.value)}{dur.unit}"
 
 
 def _fmt_annotation(ann: Annotation) -> str:
