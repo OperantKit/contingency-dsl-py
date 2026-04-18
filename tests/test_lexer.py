@@ -68,25 +68,22 @@ class TestLimitedHoldAlias:
 
 
 class TestUnrecognizedTimeUnitSuffix:
-    """Unrecognized time unit suffixes must raise LexError (#37-impl)."""
+    """Unrecognized time unit suffixes must raise LexError (#37-impl).
 
-    def test_fr5sec_raises_lex_error(self) -> None:
-        """'FR5sec' has unrecognized suffix 'sec'; must not be silently dropped."""
-        with pytest.raises(LexError, match="unrecognized time unit suffix.*sec"):
-            tokenize("FR5sec")
-
-    def test_vi60sec_raises_lex_error(self) -> None:
-        with pytest.raises(LexError, match="unrecognized time unit suffix.*sec"):
-            tokenize("VI60sec")
+    `sec` is accepted as an alias for `s` and normalized at the token level,
+    so it is NOT raised as an error (see conformance atomic_fi_compact_sec).
+    """
 
     def test_fi30m_raises_lex_error(self) -> None:
         """'FI30m' — 'm' is not a valid unit (use 'min' or 'ms')."""
         with pytest.raises(LexError, match="unrecognized time unit suffix.*m"):
             tokenize("FI30m")
 
-    def test_drl5sec_raises_lex_error(self) -> None:
-        with pytest.raises(LexError, match="unrecognized time unit suffix.*sec"):
-            tokenize("DRL5sec")
+    def test_sec_alias_is_normalized_to_s(self) -> None:
+        """'FR5sec' / 'VI60sec' / 'DRL5sec' all canonicalise to 's'."""
+        for source in ("FR5sec", "VI60sec", "DRL5sec"):
+            pairs = _token_pairs(source)
+            assert pairs[-1] == (TokenType.TIME_UNIT, "s"), f"{source}: {pairs}"
 
     def test_valid_units_still_work(self) -> None:
         """Confirm 's', 'ms', 'min' still tokenize correctly."""

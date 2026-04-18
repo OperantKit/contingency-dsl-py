@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..ast import Atomic, LimitedHold, ScheduleExpr, ScheduleType
+from ..ast import AnnotatedSchedule, Annotation, Atomic, LimitedHold, ScheduleExpr, ScheduleType
 from ..enums import Distribution, Domain
 
 
@@ -50,10 +50,16 @@ class TTauParams:
         Cycle duration (must be > 0).
     tau : float
         Reinforcement window duration (0 < tau ≤ T).
+    annotations : tuple[Annotation, ...]
+        Optional metadata carried through the conversion. Annotations are
+        not part of the T-τ coordinate system; they are preserved so that
+        round-trips through T-τ do not lose user-supplied context (e.g.,
+        `@reinforcer("pellet")`, `@subject(species="rat")`).
     """
 
     T: float
     tau: float
+    annotations: tuple[Annotation, ...] = ()
 
     def __post_init__(self) -> None:
         if self.T <= 0:
@@ -108,19 +114,20 @@ _TTAU_CONVERTIBLE_DOMAINS: frozenset[Domain] = frozenset(
 )
 
 
-def to_ttau(schedule: Atomic) -> TTauParams:
-    """Convert a lattice Atomic schedule to T-tau parameters.
+def to_ttau(schedule: Atomic | AnnotatedSchedule) -> TTauParams:
+    """Convert a lattice Atomic (optionally annotated) to T-tau parameters.
 
     Parameters
     ----------
-    schedule : Atomic
-        An atomic schedule from the 3×3 lattice. Must have
-        domain ∈ {INTERVAL, TIME}.
+    schedule : Atomic | AnnotatedSchedule
+        An atomic schedule from the 3×3 lattice, or an ``AnnotatedSchedule``
+        wrapping one. Must have domain ∈ {INTERVAL, TIME}.
 
     Returns
     -------
     TTauParams
-        The T-tau representation. For all convertible schedules,
+        The T-tau representation with any attached annotations carried
+        across unchanged. For all convertible schedules,
         T = schedule.value and τ = schedule.value (duty_cycle = 1.0).
 
     Raises
@@ -130,6 +137,16 @@ def to_ttau(schedule: Atomic) -> TTauParams:
     ValueError
         If ``schedule.value <= 0``.
     """
+    annotations: tuple[Annotation, ...] = ()
+    if isinstance(schedule, AnnotatedSchedule):
+        if not isinstance(schedule.expr, Atomic):
+            raise TypeError(
+                "to_ttau only accepts Atomic schedules or AnnotatedSchedule("
+                "Atomic); got AnnotatedSchedule wrapping "
+                f"{type(schedule.expr).__name__}"
+            )
+        annotations = tuple(schedule.annotations)
+        schedule = schedule.expr
     if schedule.domain == Domain.RATIO:
         raise RatioScheduleError(schedule)
     if schedule.value <= 0:
@@ -137,7 +154,9 @@ def to_ttau(schedule: Atomic) -> TTauParams:
             f"Schedule value must be positive for T-tau conversion, "
             f"got {schedule.value}"
         )
-    return TTauParams(T=schedule.value, tau=schedule.value)
+    return TTauParams(
+        T=schedule.value, tau=schedule.value, annotations=annotations
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -181,10 +200,20 @@ def from_ttau(
 
     inner = Atomic(ScheduleType(distribution, domain), params.T)
 
+    result: ScheduleExpr
     if params.tau < params.T:
-        return LimitedHold(hold_duration=params.tau, inner=inner)
+        result = LimitedHold(hold_duration=params.tau, inner=inner)
+    else:
+        result = inner
 
-    return inner
+    # Re-attach annotations carried through the T-τ round-trip. Annotations
+    # live at the schedule level (per `schema/operant/ast.schema.json`), so
+    # they wrap the resulting expression rather than the inner Atomic.
+    if params.annotations:
+        result = AnnotatedSchedule(
+            expr=result, annotations=tuple(params.annotations)
+        )
+    return result
 
 
 # ---------------------------------------------------------------------------

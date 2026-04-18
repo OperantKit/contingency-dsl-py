@@ -1,8 +1,10 @@
 # contingency-dsl-py
 
-Python reference parser for [contingency-dsl](../contingency-dsl/).
+:jp: [日本語版 README](README.ja.md)
 
-Zero external dependencies. Implements the full v1.0 grammar.
+Python reference parser for [contingency-dsl](https://github.com/OperantKit/contingency-dsl).
+
+Zero external dependencies. Implements the full grammar.
 
 ## Usage
 
@@ -11,3 +13,7 @@ from contingency_dsl import parse
 
 program = parse("Conc(VI30s, VI60s)")
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE).

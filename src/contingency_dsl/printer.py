@@ -8,7 +8,6 @@ from __future__ import annotations
 from .ast import (
     AnnotatedSchedule,
     Annotation,
-    AnnotationArg,
     Atomic,
     Binding,
     Compound,
@@ -45,6 +44,9 @@ def format_program(program: Program) -> str:
     """Format a complete Program to DSL text."""
     parts: list[str] = []
 
+    for ann in program.program_annotations:
+        parts.append(_fmt_annotation(ann))
+
     for decl in program.param_decls:
         parts.append(f"{decl.name} = {_fmt_value(decl.value, decl.time_unit)}")
 
@@ -79,9 +81,10 @@ def format_expr(expr: ScheduleExpr) -> str:
                 if inc is not None:
                     params.append(f"increment={_fmt_num(inc)}")
                 return f"PR({', '.join(params)})"
-            if step and step != "hodos":
-                return f"PR({step})"
-            return "PR"
+            # Always emit a parenthesised form so the printed text re-parses;
+            # the bare `PR` keyword alone is reserved to error at parse time
+            # (error_pr_bare fixture).
+            return f"PR({step or 'hodos'})"
 
         case Modifier(modifier="Repeat", value=count, inner=inner) if inner is not None and count is not None:
             return f"Repeat({_fmt_num(count)}, {format_expr(inner)})"
@@ -172,21 +175,29 @@ def _fmt_duration(dur: Duration) -> str:
 
 def _fmt_annotation(ann: Annotation) -> str:
     """Format a single annotation."""
-    if not ann.args:
-        return f"@{ann.name}"
+    source = ann.label or ann.keyword
+    if ann.positional is None and not ann.params:
+        return f"@{source}"
     parts: list[str] = []
-    for arg in ann.args:
-        if arg.key is not None:
-            parts.append(f"{arg.key}={_fmt_ann_value(arg.value)}")
-        else:
-            parts.append(_fmt_ann_value(arg.value))
-    return f"@{ann.name}({', '.join(parts)})"
+    if ann.positional is not None:
+        parts.append(_fmt_ann_value(ann.positional))
+    if ann.params:
+        for key, val in ann.params.items():
+            parts.append(f"{key}={_fmt_ann_value(val)}")
+    return f"@{source}({', '.join(parts)})"
 
 
-def _fmt_ann_value(val: str | float) -> str:
+def _fmt_ann_value(val) -> str:
     """Format an annotation argument value."""
+    if isinstance(val, bool):
+        return "true" if val else "false"
     if isinstance(val, str):
         return f'"{val}"'
+    if isinstance(val, dict):
+        # time_value: {"value": 60, "time_unit": "min"}
+        return f"{_fmt_num(val['value'])}{val['time_unit']}"
+    if isinstance(val, list):
+        return "[" + ", ".join(_fmt_ann_value(v) for v in val) + "]"
     return _fmt_num(val)
 
 

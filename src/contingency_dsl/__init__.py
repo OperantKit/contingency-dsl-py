@@ -23,10 +23,29 @@ from .ast import (
 )
 from .enums import Combinator, Distribution, Domain
 from .errors import DslError, LexError, ParseError, SemanticError
-from .extensions import ExtensionModule, ExtensionRegistry
+from .extensions import (
+    CyclicDependencyError,
+    ExtensionModule,
+    ExtensionRegistry,
+    UnknownPrimitiveError,
+)
 from .analyzer import AnalysisResult, analyze
 from .parser import parse
 from .printer import format_expr, format_program
+from .experiment import (
+    Criterion,
+    CumulativeReinforcements,
+    Experiment,
+    ExperimenterJudgment,
+    FixedSessions,
+    Paper,
+    PerformanceCriterion,
+    Phase,
+    PhaseRef,
+    PhaseSchedule,
+    PhaseSequence,
+    Stability,
+)
 from .respondent import (
     CSOnly,
     Compound as RespondentCompound,
@@ -77,8 +96,10 @@ __all__ = [
     "ParseError",
     "SemanticError",
     # Extensions
+    "CyclicDependencyError",
     "ExtensionModule",
     "ExtensionRegistry",
+    "UnknownPrimitiveError",
     # Analyzer
     "analyze",
     "AnalysisResult",
@@ -88,6 +109,19 @@ __all__ = [
     # Serializer
     "to_dict",
     "from_dict",
+    # Experiment layer
+    "Criterion",
+    "CumulativeReinforcements",
+    "Experiment",
+    "ExperimenterJudgment",
+    "FixedSessions",
+    "Paper",
+    "PerformanceCriterion",
+    "Phase",
+    "PhaseRef",
+    "PhaseSchedule",
+    "PhaseSequence",
+    "Stability",
     # Respondent Tier A primitives
     "CSOnly",
     "RespondentCompound",

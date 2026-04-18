@@ -187,12 +187,13 @@ def _consume_name(parser: _Parser, expected_value: str) -> Token:
 
 
 def _parse_kwarg_key(parser: _Parser, allowed: frozenset[str], context: str) -> str:
-    """Peek at an IDENTIFIER/PR_STEP and consume the key followed by '='.
+    """Peek at an IDENTIFIER and consume the key followed by '='.
 
-    PR_STEP is used here because the lexer tags `exponential`, `uniform`,
-    `linear`, `hodos` as PR_STEP; respondent uses `uniform` and
-    `exponential` as distribution values (see _iti_distribution).
-    Keys themselves are always plain lowercase identifiers.
+    Keyword-argument keys are always plain lowercase identifiers at this
+    position. Values at some positions (notably ITI `distribution`) accept
+    cross-layer distribution-name lexemes; see the `distribution_name`
+    production in `schema/foundations/grammar.ebnf` and the per-call
+    handling in `_parse_iti`.
     """
     tok = parser._peek()
     if tok.type != TokenType.IDENTIFIER or tok.value not in allowed:
@@ -386,8 +387,11 @@ def _parse_serial(parser: _Parser) -> Serial:
     return Serial(cs_list=items, isi=isi)
 
 
-# The lexer tags "fixed", "uniform", "exponential" inconsistently:
-# `fixed` is IDENTIFIER; `uniform` and `exponential` are PR_STEP. Recognize both.
+# Cross-layer distribution-name lexemes (see schema/foundations/grammar.ebnf
+# §"Cross-layer distribution-name lexemes"). The lexer emits DISTRIBUTION_NAME
+# for all five cross-layer lexemes ({hodos, linear, exponential, uniform,
+# fixed}); semantic validity at this position is enforced by matching against
+# the respondent-admissible subset below.
 _ITI_DISTRIBUTIONS: frozenset[str] = frozenset({"fixed", "uniform", "exponential"})
 
 
@@ -407,7 +411,7 @@ def _parse_iti(parser: _Parser) -> ITI:
     dist_tok = parser._peek()
     if dist_tok.value not in _ITI_DISTRIBUTIONS or dist_tok.type not in (
         TokenType.IDENTIFIER,
-        TokenType.PR_STEP,
+        TokenType.DISTRIBUTION_NAME,
     ):
         raise ParseError(
             f"ITI distribution must be one of {sorted(_ITI_DISTRIBUTIONS)}, "

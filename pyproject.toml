@@ -1,18 +1,24 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "contingency-dsl-py"
-version = "1.0.0a1"
+dynamic = ["version"]
 description = "Python reference parser for contingency-dsl — a text-based DSL for declaring reinforcement contingencies."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 dependencies = []
 
 [project.optional-dependencies]
 test = ["pytest>=8", "pytest-cov"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/contingency_dsl/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/contingency_dsl"]

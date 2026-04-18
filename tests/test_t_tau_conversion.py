@@ -99,10 +99,20 @@ def test_from_ttau_success(case: dict) -> None:
     expected = case["expected"]
 
     if expected["type"] == "Atomic":
-        assert isinstance(result, Atomic)
-        assert result.dist == DIST_MAP[expected["dist"]]
-        assert result.domain == DOMAIN_MAP[expected["domain"]]
-        assert result.value == pytest.approx(expected["value"])
+        # The fixture uses the flattened AST-schema form: `{type: "Atomic",
+        # ..., limitedHold: N}`. In the Python AST this is `LimitedHold(
+        # inner=Atomic(...))`; unwrap when the fixture carries `limitedHold`.
+        if "limitedHold" in expected:
+            assert isinstance(result, LimitedHold)
+            assert result.hold_duration == pytest.approx(expected["limitedHold"])
+            atomic = result.inner
+            assert isinstance(atomic, Atomic)
+        else:
+            assert isinstance(result, Atomic)
+            atomic = result
+        assert atomic.dist == DIST_MAP[expected["dist"]]
+        assert atomic.domain == DOMAIN_MAP[expected["domain"]]
+        assert atomic.value == pytest.approx(expected["value"])
     elif expected["type"] == "LimitedHold":
         assert isinstance(result, LimitedHold)
         assert result.hold_duration == pytest.approx(expected["hold_duration"])
@@ -146,6 +156,115 @@ def test_roundtrip(case: dict) -> None:
     assert recovered.domain == original.domain
     assert recovered.value == pytest.approx(original.value)
     # time_unit is not preserved through T-tau (T-tau is unit-agnostic)
+
+
+# ---------------------------------------------------------------------------
+# annotation-preservation conformance
+# ---------------------------------------------------------------------------
+
+_ANNOTATION_CASES = _load_cases("annotation_preservation.json")
+
+
+def _annotation_from_dict(d: dict):
+    from contingency_dsl.ast import Annotation
+
+    return Annotation(
+        keyword=d["keyword"],
+        positional=d.get("positional"),
+        params=d.get("params"),
+    )
+
+
+def _annotation_to_dict(ann) -> dict:
+    d: dict = {"type": "Annotation", "keyword": ann.keyword}
+    if ann.positional is not None:
+        d["positional"] = ann.positional
+    if ann.params:
+        d["params"] = dict(ann.params)
+    return d
+
+
+@pytest.mark.parametrize(
+    "case", _ANNOTATION_CASES, ids=[c["id"] for c in _ANNOTATION_CASES]
+)
+def test_annotation_preservation(case: dict) -> None:
+    """Annotations attached to a schedule or TTauParams survive both
+    directions of the T-τ conversion."""
+    from contingency_dsl.ast import AnnotatedSchedule, Atomic, LimitedHold
+
+    law = case["law"]
+
+    if law == "forward_preservation":
+        inp = case["input"]
+        anns = tuple(_annotation_from_dict(a) for a in inp.get("annotations", ()))
+        atomic = _atomic_from_dict(inp)
+        schedule = (
+            AnnotatedSchedule(expr=atomic, annotations=anns) if anns else atomic
+        )
+        ttau = to_ttau(schedule)
+
+        expected = case["expected_ttau"]
+        assert ttau.T == pytest.approx(expected["T"])
+        assert ttau.tau == pytest.approx(expected["tau"])
+        expected_anns = expected.get("annotations", [])
+        actual_anns = [_annotation_to_dict(a) for a in ttau.annotations]
+        assert actual_anns == expected_anns
+
+    elif law == "backward_preservation":
+        tt = case["input_ttau"]
+        anns = tuple(_annotation_from_dict(a) for a in tt.get("annotations", ()))
+        params = TTauParams(T=tt["T"], tau=tt["tau"], annotations=anns)
+        domain = DOMAIN_MAP[case["disambig"]["domain"]]
+        distribution = DIST_MAP[case["disambig"]["distribution"]]
+        result = from_ttau(params, domain=domain, distribution=distribution)
+
+        expected = case["expected"]
+        expected_anns = expected.get("annotations", [])
+        if expected_anns:
+            assert isinstance(result, AnnotatedSchedule)
+            actual_anns = [_annotation_to_dict(a) for a in result.annotations]
+            assert actual_anns == expected_anns
+            inner_atomic = result.expr
+            if isinstance(inner_atomic, LimitedHold):
+                inner_atomic = inner_atomic.inner
+        else:
+            inner_atomic = result.inner if isinstance(result, LimitedHold) else result
+        assert isinstance(inner_atomic, Atomic)
+        assert inner_atomic.dist == DIST_MAP[expected["dist"]]
+        assert inner_atomic.domain == DOMAIN_MAP[expected["domain"]]
+        assert inner_atomic.value == pytest.approx(expected["value"])
+
+    elif law == "roundtrip_preservation":
+        inp = case["input"]
+        input_anns_dicts = inp.get("annotations", [])
+        anns = tuple(_annotation_from_dict(a) for a in input_anns_dicts)
+        atomic = _atomic_from_dict(inp)
+        schedule = (
+            AnnotatedSchedule(expr=atomic, annotations=anns) if anns else atomic
+        )
+        ttau = to_ttau(schedule)
+        recovered = from_ttau(ttau, domain=atomic.domain, distribution=atomic.dist)
+
+        if case.get("expected_annotations_identical"):
+            if input_anns_dicts:
+                assert isinstance(recovered, AnnotatedSchedule)
+                actual_anns = [_annotation_to_dict(a) for a in recovered.annotations]
+                assert actual_anns == input_anns_dicts
+                inner_atomic = recovered.expr
+                if isinstance(inner_atomic, LimitedHold):
+                    inner_atomic = inner_atomic.inner
+            else:
+                assert not isinstance(recovered, AnnotatedSchedule)
+                inner_atomic = recovered
+                if isinstance(inner_atomic, LimitedHold):
+                    inner_atomic = inner_atomic.inner
+            assert isinstance(inner_atomic, Atomic)
+            assert inner_atomic.dist == atomic.dist
+            assert inner_atomic.domain == atomic.domain
+            assert inner_atomic.value == pytest.approx(atomic.value)
+
+    else:
+        pytest.fail(f"unknown preservation law: {law!r}")
 
 
 # ---------------------------------------------------------------------------

@@ -8,8 +8,8 @@ from __future__ import annotations
 from .ast import (
     AnnotatedSchedule,
     Annotation,
-    AnnotationArg,
     Atomic,
+    AversiveSchedule,
     Binding,
     CombinatorParamValue,
     Compound,
@@ -25,8 +25,29 @@ from .ast import (
     ScheduleType,
     SecondOrder,
     Special,
+    AdjustingSchedule,
+    InterlockingSchedule,
+    ResponseCost,
+    ResponseCostWrapped,
+    Timeout,
+    TimeoutWrapped,
+    TrialBased,
 )
 from .enums import Combinator, Distribution, Domain
+from .experiment import (
+    Criterion,
+    CumulativeReinforcements,
+    Experiment,
+    ExperimenterJudgment,
+    FixedSessions,
+    Paper,
+    PerformanceCriterion,
+    Phase,
+    PhaseRef,
+    PhaseSchedule,
+    PhaseSequence,
+    Stability,
+)
 from .respondent import (
     CSOnly,
     Compound as RespondentCompound,
@@ -46,14 +67,133 @@ from .respondent import (
 )
 
 
-def to_dict(program: Program) -> dict:
-    """Serialize a Program AST to a JSON-compatible dict."""
-    return {
+def to_dict(program: Program | PhaseSequence | Paper) -> dict:
+    """Serialize a Program, PhaseSequence, or Paper AST to a dict."""
+    if isinstance(program, Paper):
+        return _paper_to_dict(program)
+    if isinstance(program, PhaseSequence):
+        return _phase_sequence_to_dict(program)
+    # Hoist annotations attached directly to the top-level schedule to a
+    # Program-level `annotations` field, matching the fixture convention
+    # (schema/operant/ast.schema.json: schedule-level annotations attach to
+    # the leaf, but the top-level DSL expression's trailing annotations are
+    # program-scoped).
+    schedule = program.schedule
+    hoisted_annotations: list = []
+    # Only hoist when the wrapped schedule is a stateful / trial-based /
+    # modifier leaf. Simple Atomic / Compound / LimitedHold / AversiveSchedule
+    # / ResponseCostWrapped / Respondent primitives keep the inline leaf-
+    # annotations convention per their respective fixtures.
+    _HOISTABLE = (
+        AdjustingSchedule, InterlockingSchedule, Modifier, TrialBased,
+    )
+    if isinstance(schedule, AnnotatedSchedule) and isinstance(schedule.expr, _HOISTABLE):
+        inner = schedule.expr
+        # Declaration-mode MTS (with `samples`) keeps annotations inline on
+        # the schedule — training/testing fixtures attach to the declared
+        # stimulus structure, not to the program.
+        if isinstance(inner, TrialBased) and "samples" in inner.params:
+            pass
+        else:
+            hoisted_annotations = [_annotation_to_dict(a) for a in schedule.annotations]
+            schedule = inner
+    d: dict = {
         "type": "Program",
-        "param_decls": [_param_decl_to_dict(d) for d in program.param_decls],
+        "program_annotations": [_annotation_to_dict(a) for a in program.program_annotations],
+        "param_decls": [_param_decl_to_dict(x) for x in program.param_decls],
         "bindings": [_binding_to_dict(b) for b in program.bindings],
-        "schedule": _expr_to_dict(program.schedule),
+        "schedule": _expr_to_dict(schedule),
     }
+    if hoisted_annotations:
+        d["annotations"] = hoisted_annotations
+    return d
+
+
+def _phase_sequence_to_dict(seq: PhaseSequence) -> dict:
+    d: dict = {
+        "type": "PhaseSequence",
+        "shared_annotations": [
+            _annotation_to_dict(a) for a in seq.shared_annotations
+        ],
+        "shared_param_decls": [],
+        "phases": [_phase_to_dict(p) for p in seq.phases],
+    }
+    return d
+
+
+def _paper_to_dict(paper: Paper) -> dict:
+    d: dict = {
+        "type": "Paper",
+        "shared_annotations": [
+            _annotation_to_dict(a) for a in paper.shared_annotations
+        ],
+        "experiments": [_experiment_to_dict(e) for e in paper.experiments],
+    }
+    return d
+
+
+def _experiment_to_dict(exp: Experiment) -> dict:
+    body = exp.body
+    if isinstance(body, PhaseSequence):
+        body_dict = _phase_sequence_to_dict(body)
+    else:
+        body_dict = to_dict(body)
+    return {
+        "type": "Experiment",
+        "label": exp.label,
+        "body": body_dict,
+    }
+
+
+def _phase_to_dict(phase: Phase) -> dict:
+    d: dict = {"type": "Phase", "label": phase.label}
+    if phase.criterion is not None:
+        d["criterion"] = _criterion_to_dict(phase.criterion)
+    d["schedule"] = _phase_schedule_to_dict(phase.schedule)
+    if phase.phase_annotations:
+        d["phase_annotations"] = [
+            _annotation_to_dict(a) for a in phase.phase_annotations
+        ]
+    return d
+
+
+def _phase_schedule_to_dict(sched: PhaseSchedule) -> dict | None:
+    if sched is None:
+        return None
+    if isinstance(sched, PhaseRef):
+        return {"type": "PhaseRef", "ref": sched.ref}
+    return _expr_to_dict(sched)
+
+
+def _criterion_to_dict(criterion: Criterion) -> dict:
+    if isinstance(criterion, FixedSessions):
+        return {"type": "FixedSessions", "count": criterion.count}
+    if isinstance(criterion, Stability):
+        d: dict = {"type": "Stability", "method": criterion.method}
+        if criterion.min_sessions is not None:
+            d["min_sessions"] = criterion.min_sessions
+        if criterion.window_sessions is not None:
+            d["window_sessions"] = criterion.window_sessions
+        if criterion.max_change_pct is not None:
+            d["max_change_pct"] = criterion.max_change_pct
+        if criterion.measure is not None:
+            d["measure"] = criterion.measure
+        return d
+    if isinstance(criterion, ExperimenterJudgment):
+        return {"type": "ExperimenterJudgment"}
+    if isinstance(criterion, CumulativeReinforcements):
+        return {"type": "CumulativeReinforcements", "count": criterion.count}
+    if isinstance(criterion, PerformanceCriterion):
+        d = {
+            "type": "PerformanceCriterion",
+            "measure": criterion.measure,
+            "threshold": criterion.threshold,
+            "op": criterion.op,
+        }
+        if criterion.window_sessions is not None:
+            d["window_sessions"] = criterion.window_sessions
+        return d
+    raise ValueError(f"unknown criterion: {criterion!r}")
 
 
 def _expr_to_dict(expr: ScheduleExpr) -> dict:
@@ -99,13 +239,40 @@ def _expr_to_dict(expr: ScheduleExpr) -> dict:
                 d["pr_start"] = expr.pr_start
             if expr.pr_increment is not None:
                 d["pr_increment"] = expr.pr_increment
+            if expr.pr_ratio is not None:
+                d["pr_ratio"] = expr.pr_ratio
+            if expr.pctl_target is not None:
+                d["pctl_target"] = expr.pctl_target
+            if expr.pctl_rank is not None:
+                d["pctl_rank"] = expr.pctl_rank
+            if expr.pctl_window is not None:
+                d["pctl_window"] = expr.pctl_window
+            if expr.pctl_dir is not None:
+                d["pctl_dir"] = expr.pctl_dir
+            if expr.length is not None:
+                d["length"] = expr.length
             return d
 
         case LimitedHold(hold_duration=dur, inner=inner, time_unit=unit):
+            # Per schema/operant/ast.schema.json, LimitedHold is a leaf-level
+            # attribute (`limitedHold`, `limitedHoldUnit`) rather than a
+            # wrapper node. Flatten when the inner expression is a leaf that
+            # the schema admits.
+            inner_dict = _expr_to_dict(inner)
+            if isinstance(
+                inner,
+                (Atomic, Special, Modifier, SecondOrder, AdjustingSchedule,
+                 InterlockingSchedule, AversiveSchedule, TrialBased),
+            ):
+                inner_dict["limitedHold"] = dur
+                if unit is not None:
+                    inner_dict["limitedHoldUnit"] = unit
+                return inner_dict
+            # Fallback: wrapper node for non-leaf inners (e.g. Compound).
             d = {
                 "type": "LimitedHold",
                 "hold_duration": dur,
-                "inner": _expr_to_dict(inner),
+                "inner": inner_dict,
             }
             if unit is not None:
                 d["time_unit"] = unit
@@ -121,10 +288,91 @@ def _expr_to_dict(expr: ScheduleExpr) -> dict:
         case IdentifierRef(name=name):
             return {"type": "IdentifierRef", "name": name}
 
+        case AversiveSchedule(kind=kind, params=params):
+            return {
+                "type": "AversiveSchedule",
+                "kind": kind,
+                "params": dict(params),
+            }
+
+        case AdjustingSchedule(
+            adj_target=target, adj_start=start, adj_step=step,
+            adj_min=mn, adj_max=mx,
+        ):
+            return {
+                "type": "AdjustingSchedule",
+                "adj_target": target,
+                "adj_start": start,
+                "adj_step": step,
+                "adj_min": mn,
+                "adj_max": mx,
+            }
+
+        case InterlockingSchedule(interlock_R0=r0, interlock_T=t):
+            return {
+                "type": "InterlockingSchedule",
+                "interlock_R0": r0,
+                "interlock_T": t,
+            }
+
+        case TrialBased(trial_type=tt, params=p):
+            # Declaration-mode MTS (stimulus-class / training / testing
+            # contexts) uses `MTS(samples=N, comparisons=M)` shape and
+            # serialises with `type: "MTS"` and a nested `params` object.
+            if tt == "MTS" and "samples" in p:
+                return {
+                    "type": "MTS",
+                    "params": {
+                        k: (_expr_to_dict(v) if hasattr(v, "__dataclass_fields__") else v)
+                        for k, v in p.items()
+                        if k in ("samples", "comparisons")
+                    },
+                }
+            out: dict = {"type": "TrialBased", "trial_type": tt}
+            for k, v in p.items():
+                if hasattr(v, "__dataclass_fields__"):
+                    out[k] = _expr_to_dict(v)  # type: ignore[arg-type]
+                else:
+                    out[k] = v
+            return out
+
+        case TimeoutWrapped(inner=inner, timeout=t):
+            # Flatten onto leaf per ast.schema.json §timeout.
+            inner_dict = _expr_to_dict(inner)
+            timeout_dict: dict = {"duration": t.duration}
+            if t.duration_unit is not None:
+                timeout_dict["durationUnit"] = t.duration_unit
+            timeout_dict["resetOnResponse"] = t.reset_on_response
+            inner_dict["timeout"] = timeout_dict
+            return inner_dict
+
+        case ResponseCostWrapped(inner=inner, response_cost=rc):
+            # Flatten onto leaf per ast.schema.json §responseCost.
+            inner_dict = _expr_to_dict(inner)
+            inner_dict["responseCost"] = {"amount": rc.amount, "unit": rc.unit}
+            return inner_dict
+
         case AnnotatedSchedule(expr=inner, annotations=anns):
+            # Per schema/operant/ast.schema.json, schedule-level annotations
+            # attach as an `annotations` property on the leaf schedule node
+            # rather than wrapping it. Flatten into supported leaf shapes.
+            inner_dict = _expr_to_dict(inner)
+            if isinstance(
+                inner,
+                (Atomic, Special, Modifier, SecondOrder, LimitedHold, Compound,
+                 AdjustingSchedule, InterlockingSchedule, AversiveSchedule,
+                 TrialBased, TimeoutWrapped, ResponseCostWrapped),
+            ):
+                ann_list = [_annotation_to_dict(a) for a in anns]
+                existing = inner_dict.get("annotations")
+                if existing:
+                    inner_dict["annotations"] = ann_list + existing
+                else:
+                    inner_dict["annotations"] = ann_list
+                return inner_dict
             return {
                 "type": "AnnotatedSchedule",
-                "expr": _expr_to_dict(inner),
+                "expr": inner_dict,
                 "annotations": [_annotation_to_dict(a) for a in anns],
             }
 
@@ -226,14 +474,33 @@ def _duration_to_dict(dur: Duration) -> dict:
     return {"value": dur.value, "unit": dur.unit}
 
 
-def _param_value_to_dict(param: CombinatorParamValue) -> dict:
+def _param_value_to_dict(param):
     if isinstance(param, DirectionalCOD):
         d: dict = {}
         if param.base is not None:
             d["base"] = _compound_param_to_dict(param.base)
         d["directional"] = [_directional_entry_to_dict(e) for e in param.directional]
         return d
+    if isinstance(param, dict):
+        # PUNISH payload or Overlay raw values. Recurse through dict /
+        # list values, rewriting schedule AST nodes to their dict form.
+        return _serialize_raw_payload(param)
+    if isinstance(param, str):
+        # Overlay target=<identifier>
+        return param
     return _compound_param_to_dict(param)
+
+
+def _serialize_raw_payload(value):
+    """Recursively convert a raw dict/list payload: pass scalars through
+    and serialise any embedded ScheduleExpr-like dataclass nodes."""
+    if hasattr(value, "__dataclass_fields__"):
+        return _expr_to_dict(value)
+    if isinstance(value, dict):
+        return {k: _serialize_raw_payload(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_serialize_raw_payload(v) for v in value]
+    return value
 
 
 def _compound_param_to_dict(param: CompoundParam) -> dict:
@@ -270,26 +537,86 @@ def _binding_to_dict(binding: Binding) -> dict:
 
 
 def _annotation_to_dict(ann: Annotation) -> dict:
-    args = []
-    for arg in ann.args:
-        a: dict = {"value": arg.value}
-        if arg.key is not None:
-            a["key"] = arg.key
-        args.append(a)
-    return {"name": ann.name, "args": args}
+    d: dict = {"type": "Annotation", "keyword": ann.keyword}
+    if ann.positional is not None:
+        d["positional"] = ann.positional
+    # @probe_policy emits `params: {}` even when empty (the schema treats
+    # the parenthesised form as meaningful); other annotations only emit
+    # `params` when non-empty to keep output concise. `kwargs` is the
+    # paper-layer alias expected by `schema/experiment/experiment.schema.json`
+    # fixtures; it mirrors `params` for dual-convention compatibility.
+    if ann.params:
+        payload = dict(ann.params)  # time_value dicts pass through as-is
+        d["params"] = payload
+        d["kwargs"] = payload
+    elif ann.keyword == "probe_policy":
+        d["params"] = {}
+        d["kwargs"] = {}
+    if ann.label is not None:
+        d["label"] = ann.label
+    return d
 
 
 def from_dict(d: dict) -> Program:
     """Deserialize a dict to a Program AST."""
+    schedule = _expr_from_dict(d["schedule"])
+    # Re-attach hoisted Program-level annotations as an AnnotatedSchedule so
+    # a subsequent to_dict roundtrip produces the same serialized form.
+    if d.get("annotations"):
+        schedule = AnnotatedSchedule(
+            expr=schedule,
+            annotations=tuple(
+                _annotation_from_dict(a) for a in d["annotations"]
+            ),
+        )
     return Program(
+        program_annotations=tuple(
+            _annotation_from_dict(a) for a in d.get("program_annotations", [])
+        ),
         param_decls=tuple(_param_decl_from_dict(pd) for pd in d.get("param_decls", [])),
         bindings=tuple(_binding_from_dict(b) for b in d.get("bindings", [])),
-        schedule=_expr_from_dict(d["schedule"]),
+        schedule=schedule,
+    )
+
+
+def _annotation_from_dict(d: dict) -> Annotation:
+    return Annotation(
+        keyword=d["keyword"],
+        positional=d.get("positional"),
+        params=d.get("params"),
     )
 
 
 def _expr_from_dict(d: dict) -> ScheduleExpr:
-    """Deserialize a dict to a ScheduleExpr."""
+    """Deserialize a dict to a ScheduleExpr.
+
+    Schedule-level annotations are stored by the serializer directly on the
+    leaf node's dict (an ``annotations`` key alongside ``type``, ``dist``,
+    etc.) for leaf types that the schema treats as annotation-capable
+    (Atomic, Special, Modifier, SecondOrder, LimitedHold, Compound). When
+    present, the returned value is wrapped in ``AnnotatedSchedule`` so
+    that ``to_dict(from_dict(d)) == d`` round-trips.
+    """
+    return _maybe_wrap_annotations(_expr_from_dict_inner(d), d)
+
+
+def _maybe_wrap_annotations(
+    expr: ScheduleExpr, d: dict
+) -> ScheduleExpr:
+    """If *d* carries schedule-level annotations, wrap *expr* in AnnotatedSchedule."""
+    annotations_list = d.get("annotations")
+    if not annotations_list or isinstance(expr, AnnotatedSchedule):
+        return expr
+    return AnnotatedSchedule(
+        expr=expr,
+        annotations=tuple(
+            _annotation_from_dict(a) for a in annotations_list
+        ),
+    )
+
+
+def _expr_from_dict_inner(d: dict) -> ScheduleExpr:
+    """Inner deserializer without AnnotatedSchedule wrapping."""
     t = d["type"]
 
     if t == "Atomic":
@@ -430,13 +757,7 @@ def _expr_from_dict(d: dict) -> ScheduleExpr:
         return AnnotatedSchedule(
             expr=_expr_from_dict(d["expr"]),
             annotations=tuple(
-                Annotation(
-                    name=a["name"],
-                    args=tuple(
-                        AnnotationArg(value=arg["value"], key=arg.get("key"))
-                        for arg in a.get("args", [])
-                    ),
-                )
+                _annotation_from_dict(a)
                 for a in d.get("annotations", [])
             ),
         )

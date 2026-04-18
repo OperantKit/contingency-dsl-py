@@ -29,7 +29,7 @@ class Domain(Enum):
 
 
 class Combinator(Enum):
-    """Compound schedule combinators (8 total)."""
+    """Compound schedule combinators."""
 
     CONC = "Conc"  # Parallel, independent
     ALT = "Alt"  # Parallel, OR
@@ -39,6 +39,8 @@ class Combinator(Enum):
     MULT = "Mult"  # Alternating, discriminated
     MIX = "Mix"  # Alternating, undiscriminated
     OVERLAY = "Overlay"  # Punishment overlay (Azrin & Holz, 1966)
+    INTERPOLATE = "Interpolate"  # Mid-session schedule change (interpolated probe)
+    INTERP = "Interp"  # Short alias for Interpolate
 
 
 # Schedule type keywords: all 3x3 combinations
@@ -51,11 +53,12 @@ COMBINATOR_KEYWORDS: frozenset[str] = frozenset(c.value for c in Combinator)
 
 DR_KEYWORDS: frozenset[str] = frozenset({"DRL", "DRH", "DRO"})
 
-# Compound keyword argument names (COD, FRCO, BO and their aliases)
+# Compound keyword argument names (COD, FRCO, BO, PUNISH and their aliases)
 KW_ARG_KEYWORDS: dict[str, str] = {
     "COD": "COD", "ChangeoverDelay": "COD",
     "FRCO": "FRCO", "FixedRatioChangeover": "FRCO",
     "BO": "BO", "Blackout": "BO",
+    "PUNISH": "PUNISH",
 }
 
 SPECIAL_KEYWORDS: frozenset[str] = frozenset({"EXT", "CRF"})
@@ -80,3 +83,17 @@ ALL_RESERVED: frozenset[str] = (
     | frozenset(KW_ARG_KEYWORDS.keys())
     | LOWERCASE_RESERVED
 )
+
+# Experiment-layer keywords (classified only when the lexer is in block mode,
+# triggered by the source containing a whole-word `phase`, `progressive`, or
+# `shaping`). Keeping these out of LOWERCASE_RESERVED preserves backward
+# compatibility for flat-mode inputs that happen to use these words as
+# identifiers.
+EXPERIMENT_BLOCK_TRIGGERS: frozenset[str] = frozenset({
+    "phase", "progressive", "shaping", "experiment",
+})
+EXPERIMENT_LAYER_KEYWORDS: frozenset[str] = frozenset({
+    "phase", "sessions", "stable", "use", "no_schedule",
+    "shaping", "progressive", "steps", "interleave", "no_trailing",
+    "advance", "when", "experiment",
+})
