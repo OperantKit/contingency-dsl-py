@@ -16,34 +16,33 @@ from contingency_dsl import parse, analyze, to_dict
 from contingency_dsl.errors import DslError, LexError, ParseError, SemanticError
 from contingency_dsl.extensions import ExtensionRegistry
 
-# Optional: measurement validator for annotation semantic error conformance tests.
-try:
-    from contingency_annotator.measurement_ext.validator import (
-        validate_measurement_annotation,
-    )
+# Measurement validator for annotation semantic error conformance tests.
+from contingency_dsl.annotations.measurement.validator import (
+    validate_measurement_annotation,
+)
 
-    _HAS_MEASUREMENT_VALIDATOR = True
-except ImportError:
-    _HAS_MEASUREMENT_VALIDATOR = False
+_HAS_MEASUREMENT_VALIDATOR = True
 
-# Optional: real extension modules. When contingency-annotator is importable
-# in the test environment, prefer the real ExtensionModule implementations
-# over the catch-all inline shim — this exercises the shipped semantic
-# validators in addition to the parser-level keyword recognition.
-try:
-    from contingency_annotator import (
-        ComposedExtension,
-        MeasurementExtension,
-        StimulusExtension,
-    )
+# Real extension modules. Shipped in contingency_dsl.annotations, so always
+# available. Exercises the shipped semantic validators in addition to the
+# parser-level keyword recognition.
+from contingency_dsl.annotations import (
+    ApparatusExtension,
+    ComposedExtension,
+    MeasurementExtension,
+    StimulusExtension,
+    SubjectsExtension,
+    TemporalExtension,
+)
 
-    _REAL_EXTENSIONS: tuple = (
-        StimulusExtension(),
-        MeasurementExtension(),
-        ComposedExtension(),
-    )
-except ImportError:
-    _REAL_EXTENSIONS = ()
+_REAL_EXTENSIONS: tuple = (
+    StimulusExtension(),
+    TemporalExtension(),
+    SubjectsExtension(),
+    ApparatusExtension(),
+    ComposedExtension(),
+    MeasurementExtension(),
+)
 
 CONFORMANCE_DIR = Path(__file__).parent.parent.parent / "contingency-dsl" / "conformance"
 
@@ -88,7 +87,7 @@ def _collect_conformance_cases():
 
 # --- Conformance test extension registry ---
 #
-# The test runner composes real extension modules from `contingency_annotator`
+# The test runner composes real extension modules from `contingency_dsl.annotations`
 # with a minimal catch-all shim that covers annotation keywords for which no
 # real extension module is yet implemented (subjects, apparatus, temporal,
 # respondent, session-structure, etc.). As more real extensions land, the

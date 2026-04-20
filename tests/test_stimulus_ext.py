@@ -28,7 +28,7 @@ from contingency_dsl import (
 from contingency_dsl.extensions import ExtensionModule, ExtensionRegistry
 
 
-# --- Inline stimulus-ext (mirrors contingency_annotator.stimulus_ext) ---
+# --- Inline stimulus-ext (mirrors contingency_dsl.annotations.stimulus) ---
 
 
 class _StimulusExt:
