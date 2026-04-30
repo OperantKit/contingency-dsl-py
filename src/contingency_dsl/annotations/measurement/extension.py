@@ -1,7 +1,7 @@
 """MeasurementExtension — implements ExtensionModule for measurement-ext.
 
-Provides @session_end, @baseline, @steady_state annotations (Phase 1).
-Schema: contingency-dsl/schema/annotations/measurement.schema.json (v1.2).
+Provides @session_end, @baseline, @steady_state annotations.
+Schema: contingency-dsl/schema/annotations/measurement.schema.json.
 """
 from __future__ import annotations
 

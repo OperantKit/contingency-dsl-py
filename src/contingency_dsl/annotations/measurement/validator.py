@@ -1,6 +1,6 @@
 """Validator for measurement annotations.
 
-Enforces constraints defined in measurement.schema.json (v1.2).
+Enforces constraints defined in measurement.schema.json.
 Rules are coded directly rather than loaded from JSON at runtime,
 matching the pattern used by stimulus_ext.
 """
