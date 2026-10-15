@@ -18,7 +18,19 @@ pip install contingency-dsl-py
 ```python
 from contingency_dsl import parse
 
-program = parse("FR 5 @reinforcer('food')")
+program = parse("FR 5")
+```
+
+Annotations such as `@reinforcer` are validated by extensions, so pass a
+registry that includes them:
+
+```python
+from contingency_dsl import parse
+from contingency_dsl.annotations import StimulusExtension
+from contingency_dsl.extensions import ExtensionRegistry
+
+registry = ExtensionRegistry.build(StimulusExtension())
+program = parse('FR 5 @reinforcer("food")', extensions=registry)
 ```
 
 ## Annotation extensions

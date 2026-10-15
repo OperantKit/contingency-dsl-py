@@ -17,7 +17,19 @@ pip install contingency-dsl-py
 ```python
 from contingency_dsl import parse
 
-program = parse("FR 5 @reinforcer('food')")
+program = parse("FR 5")
+```
+
+`@reinforcer` などのアノテーションは拡張が検証するので、それを含む
+レジストリを渡す:
+
+```python
+from contingency_dsl import parse
+from contingency_dsl.annotations import StimulusExtension
+from contingency_dsl.extensions import ExtensionRegistry
+
+registry = ExtensionRegistry.build(StimulusExtension())
+program = parse('FR 5 @reinforcer("food")', extensions=registry)
 ```
 
 ## アノテーション拡張
