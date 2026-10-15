@@ -6,6 +6,12 @@
 
 外部依存ゼロ。現行文法をフルに実装し、コア推奨アノテーション語彙も同梱する。
 
+## インストール
+
+```bash
+pip install contingency-dsl-py
+```
+
 ## 使い方
 
 ```python

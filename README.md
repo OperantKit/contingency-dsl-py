@@ -7,6 +7,12 @@ Python reference parser for [contingency-dsl](https://github.com/OperantKit/cont
 Zero external dependencies. Implements the full grammar and ships the
 core recommended annotation vocabulary.
 
+## Install
+
+```bash
+pip install contingency-dsl-py
+```
+
 ## Usage
 
 ```python
