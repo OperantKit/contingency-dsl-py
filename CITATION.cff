@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata from this file."
+type: software
+title: "contingency-dsl-py"
+authors:
+  - family-names: "Mizutani"
+    given-names: "Yuto"
+repository-code: "https://github.com/OperantKit/contingency-dsl-py"
+license: MIT
+abstract: "Python reference parser for contingency-dsl — a text-based DSL for declaring reinforcement contingencies."
