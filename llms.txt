@@ -1,0 +1,38 @@
+# contingency-dsl-py
+
+> Python reference parser for contingency-dsl, a text notation for reinforcement schedules and conditioning procedures (for example `Conc(VI30s, VI60s, COD=2s)`). Parses to a typed AST, serializes to JSON-schema-conformant dicts, and prints canonical source. Zero runtime dependencies.
+
+contingency-dsl-py is part of OperantKit, a set of Python/Rust packages for designing and running operant and respondent conditioning experiments (reinforcement schedules, session recording, analysis). Use it instead of writing a parser for schedule notation: it implements the full grammar (compound, second-order, limited hold, changeover delay, parameter declarations, respondent procedures) and is tested against the contingency-dsl conformance corpus.
+
+## Install
+
+```bash
+pip install contingency-dsl-py
+```
+
+## Minimal example
+
+```python
+from contingency_dsl import format_program, parse, to_dict
+
+program = parse("Conc(VI30s, VI60s, COD=2s)")
+print(to_dict(program)["schedule"]["combinator"])  # Conc
+print(format_program(program))  # Conc(VI30s, VI60s, COD=2s)
+```
+
+The import name is `contingency_dsl`. Annotations such as `@reinforcer("food")` or `@algorithm("fleshler-hoffman", seed=42)` require a registry: `parse(src, extensions=ExtensionRegistry.build(StimulusExtension(), TemporalExtension()))` (from `contingency_dsl.extensions` and `contingency_dsl.annotations`).
+
+## Docs
+
+- [README](https://github.com/OperantKit/contingency-dsl-py/blob/main/README.md): install, 30-second example, why not to hand-roll a parser, annotation extensions
+- [AGENTS.md](https://github.com/OperantKit/contingency-dsl-py/blob/main/AGENTS.md): when to use this package and what not to do
+- [Language specification](https://github.com/OperantKit/contingency-dsl): grammar, AST schema, conformance cases
+
+## Related packages
+
+- [contingency-dsl](https://github.com/OperantKit/contingency-dsl): the language specification this parser implements
+- [contingency-py](https://github.com/OperantKit/contingency-py): runs a parsed schedule as a reinforcement schedule engine (`pip install contingency-py`)
+- [contingency-rs](https://github.com/OperantKit/contingency-rs): Rust schedule engine and parser
+- [contingency-dsl2procedure](https://github.com/OperantKit/contingency-dsl2procedure): AST dict to Method-section text
+- [contingency-procedure2dsl](https://github.com/OperantKit/contingency-procedure2dsl): Method-section text to AST dict
+- [contingency-respondent-dsl](https://github.com/OperantKit/contingency-respondent-dsl): respondent (Pavlovian) procedure extension of the language
