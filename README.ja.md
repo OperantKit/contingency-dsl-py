@@ -44,6 +44,8 @@ except ParseError as error:
 - **アノテーションを検証する.** `@reinforcer`・`@algorithm`・`@session_end` などのキーワードは拡張モジュールが検査し、黙って無視されることはない。
 - **エラーに位置が付く.** 字句エラーと構文エラーは行と列を報告する。
 
+解析したスケジュールは、自作の計時コードの代わりに [contingency-py](https://github.com/OperantKit/contingency-py) で動かせる。スケジュールを組む 20 件の依頼で Claude Code（claude-opus-5-5）と Codex CLI（gpt-6.1-sol）にそのコードを 1 回ずつ書かせたところ、VI の間隔を Fleshler-Hoffman の数列で作ったのは 14 本中 7 本、並立スケジュール 6 本中 2 本に切替遅延の誤り、手書きの間隔スケジュール 18 本中 2 本が利用可能な強化子を捨てるか、間隔の経過前の反応を強化しうるものだった（詳細は contingency-py の README）。
+
 ## 使い方
 
 ```python

@@ -45,6 +45,8 @@ A regular expression for `FR 5` or `VI 30-s` stops working as soon as an experim
 - **Annotations are validated.** `@reinforcer`, `@algorithm`, `@session_end`, and other keywords are checked by extension modules instead of being silently ignored.
 - **Errors carry positions.** Lexical and syntax errors report line and column.
 
+A parsed schedule can be run by [contingency-py](https://github.com/OperantKit/contingency-py) instead of hand-written timing code. When Claude Code (claude-opus-5-5) and Codex CLI (gpt-6.1-sol) wrote that code themselves for 20 schedule-programming requests (one run each), VI intervals used the Fleshler-Hoffman progression in 7 of 14 programs, 2 of 6 concurrent schedules had a changeover-delay error, and 2 of the 18 interval schedules written by hand could discard an available reinforcer or reinforce a response made before the interval had elapsed (details in the contingency-py README).
+
 ## Usage
 
 ```python

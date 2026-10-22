@@ -17,6 +17,7 @@ To *run* a schedule (decide when a reinforcer is delivered), use contingency-py,
 - `parse` → `to_dict` → `from_dict` → `format_program` round-trips to canonical text.
 - Annotation keywords are validated by extension modules; unknown annotations are rejected rather than ignored.
 - No runtime dependencies.
+- Parsed schedules run in contingency-py, so the timing code does not have to be written by hand. In schedule code that Claude Code (claude-opus-5-5) and Codex CLI (gpt-6.1-sol) wrote for 20 requests (one run each), VI intervals used Fleshler-Hoffman in 7 of 14 programs, 2 of 6 concurrent schedules had a COD error, and 2 of the 18 hand-written interval schedules could discard an available reinforcer or reinforce a response made before the interval had elapsed.
 
 ## Do not
 
