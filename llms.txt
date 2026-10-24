@@ -7,7 +7,7 @@ contingency-dsl-py is part of OperantKit, a set of Python/Rust packages for desi
 ## Install
 
 ```bash
-pip install contingency-dsl-py
+pip install git+https://github.com/OperantKit/contingency-dsl-py
 ```
 
 ## Minimal example
@@ -31,7 +31,7 @@ The import name is `contingency_dsl`. Annotations such as `@reinforcer("food")` 
 ## Related packages
 
 - [contingency-dsl](https://github.com/OperantKit/contingency-dsl): the language specification this parser implements
-- [contingency-py](https://github.com/OperantKit/contingency-py): runs a parsed schedule as a reinforcement schedule engine (`pip install contingency-py`)
+- [contingency-py](https://github.com/OperantKit/contingency-py): runs a parsed schedule as a reinforcement schedule engine
 - [contingency-rs](https://github.com/OperantKit/contingency-rs): Rust schedule engine and parser
 - [contingency-dsl2procedure](https://github.com/OperantKit/contingency-dsl2procedure): AST dict to Method-section text
 - [contingency-procedure2dsl](https://github.com/OperantKit/contingency-procedure2dsl): Method-section text to AST dict
