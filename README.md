@@ -2,20 +2,25 @@
 
 :jp: [日本語版 README](README.ja.md)
 
-Python reference parser for [contingency-dsl](https://github.com/OperantKit/contingency-dsl).
+contingency-dsl-py reads schedules of reinforcement and conditioning procedures written in the [contingency-dsl](https://github.com/OperantKit/contingency-dsl) notation, such as `Conc(VI 30-s, VI 60-s, COD=2-s)`, and turns them into Python objects or plain dictionaries. It is the Python reference parser for contingency-dsl. Within [OperantKit](https://github.com/OperantKit), [contingency-py](https://github.com/OperantKit/contingency-py) runs the schedules it parses, and [contingency-dsl2procedure](https://github.com/OperantKit/contingency-dsl2procedure) writes the parsed form as Method-section text.
 
-Zero external dependencies. Implements the full grammar and ships the
-core recommended annotation vocabulary.
+**In short**
 
-## Install
+- Reads schedules from a simple `FR 5` to nested compound schedules with a changeover delay (COD), limited hold, second-order schedules, multi-phase designs, and respondent procedures.
+- Reports a mistake in a schedule with its line and column, so it is found when the file is read, not after the session.
+- Needs nothing outside the Python standard library.
+
+## Installation
+
+Python 3.11 or newer. The package is not on PyPI yet; install it from GitHub:
 
 ```bash
-pip install contingency-dsl-py
+pip install git+https://github.com/OperantKit/contingency-dsl-py
 ```
 
-## 30-second example
+## Example
 
-Parse a schedule, inspect it as a JSON-ready AST, and print it back in canonical form:
+Parse a schedule, look at it as a plain dictionary, and print it back as text:
 
 ```python
 from contingency_dsl import ParseError, format_program, from_dict, parse, to_dict
@@ -32,31 +37,11 @@ except ParseError as error:
     print(error)  # line 1, col 12: unexpected end of input
 ```
 
-To run the parsed schedule against responses, pass it to `contingency.from_dsl` from [contingency-py](https://github.com/OperantKit/contingency-py) (`pip install contingency-py`).
+The dictionary (the parsed form, or AST) is the format the other OperantKit packages exchange. `to_dict` and `from_dict` convert between it and the Python objects; `format_program` writes the canonical text.
 
-## Why not a 50-line hand-written parser?
+## Annotations
 
-A regular expression for `FR 5` or `VI 30-s` stops working as soon as an experiment needs more than one schedule:
-
-- **Full grammar.** Compound schedules (`Conc`, `Mult`, `Chain`, `Tand`, `Alt`, `Conj`, and others) nest arbitrarily, with changeover delay (`COD`, direction-specific `COD(1->2)`), fixed-ratio changeover (`FRCO`), limited hold, second-order schedules, parameter declarations, bindings, and respondent procedures.
-- **Conformance suite.** The tests replay more than 1,000 conformance cases from [contingency-dsl](https://github.com/OperantKit/contingency-dsl), and serialized ASTs are validated against its JSON Schema, so other parsers (including the Rust one in [contingency-rs](https://github.com/OperantKit/contingency-rs)) can be checked against the same cases.
-- **Round trip.** `parse` → `to_dict` → `from_dict` → `format_program` returns the canonical source text; the round trip is covered by tests.
-- **Method sections.** The AST dict is the input of [contingency-dsl2procedure](https://github.com/OperantKit/contingency-dsl2procedure), which writes the schedule as a Method-section paragraph, and [contingency-procedure2dsl](https://github.com/OperantKit/contingency-procedure2dsl) extracts schedules from published Method text.
-- **Annotations are validated.** `@reinforcer`, `@algorithm`, `@session_end`, and other keywords are checked by extension modules instead of being silently ignored.
-- **Errors carry positions.** Lexical and syntax errors report line and column.
-
-A parsed schedule can be run by [contingency-py](https://github.com/OperantKit/contingency-py) instead of hand-written timing code. When Claude Code (claude-opus-5-5) and Codex CLI (gpt-6.1-sol) wrote that code themselves for 20 schedule-programming requests (one run each), VI intervals used the Fleshler-Hoffman progression in 7 of 14 programs, 2 of 6 concurrent schedules had a changeover-delay error, and 2 of the 18 interval schedules written by hand could discard an available reinforcer or reinforce a response made before the interval had elapsed (details in the contingency-py README).
-
-## Usage
-
-```python
-from contingency_dsl import parse
-
-program = parse("FR 5")
-```
-
-Annotations such as `@reinforcer` are validated by extensions, so pass a
-registry that includes them:
+Annotations such as `@reinforcer("food")` or `@species("rat")` add Method-section details (subjects, apparatus, stimuli, measurement) to a schedule. They are checked by extension modules, so pass a registry that includes the ones you use:
 
 ```python
 from contingency_dsl import parse
@@ -67,22 +52,26 @@ registry = ExtensionRegistry.build(StimulusExtension())
 program = parse('FR 5 @reinforcer("food")', extensions=registry)
 ```
 
-## Annotation extensions
+Six extensions are included in `contingency_dsl.annotations`: `StimulusExtension`, `TemporalExtension`, `SubjectsExtension`, `ApparatusExtension`, `ComposedExtension`, and `MeasurementExtension`. You can write your own by implementing the `ExtensionModule` protocol in `contingency_dsl.extensions` and pass it alongside them.
 
-Six core annotators (`stimulus`, `temporal`, `subjects`, `apparatus`,
-`composed`, `measurement`) are shipped under `contingency_dsl.annotations`.
-They validate `@`-prefixed keywords introduced by the DSL spec:
+## Limitations
 
-```python
-from contingency_dsl.annotations import StimulusExtension, MeasurementExtension
-from contingency_dsl.extensions import ExtensionRegistry
+- This package reads schedules; it does not run them. To decide when a reinforcer is delivered, use [contingency-py](https://github.com/OperantKit/contingency-py).
+- Annotated text without a registry fails with a syntax error at the `@` (for example `unexpected token after schedule: AT '@'`), not with a message about the missing extension.
+- Not every construct in the specification is read. The respondent annotations `@cs` and `@us` are not covered by the six included extensions, and the Pavlovian procedures of [contingency-respondent-dsl](https://github.com/OperantKit/contingency-respondent-dsl) (such as `Renewal(...)`) are not parsed.
 
-registry = ExtensionRegistry.build(StimulusExtension(), MeasurementExtension())
+## For contributors
+
+```bash
+git clone https://github.com/OperantKit/contingency-dsl
+git clone https://github.com/OperantKit/contingency-dsl-py
+cd contingency-dsl-py
+pip install -e '.[test]'
+pytest
 ```
 
-Third-party extensions can implement the `ExtensionModule` Protocol
-(`contingency_dsl.extensions`) and compose alongside the built-ins.
+The conformance and schema tests read the [contingency-dsl](https://github.com/OperantKit/contingency-dsl) clone next to this one; without it they are skipped. Every `python` block in this README and in `README.ja.md` is run by `tests/test_readme_examples.py`. Notes for AI coding agents are in [AGENTS.md](AGENTS.md).
 
-## License
+## Citation and license
 
-MIT. See [LICENSE](LICENSE).
+Cite this package with [CITATION.cff](CITATION.cff). MIT License; see [LICENSE](LICENSE).

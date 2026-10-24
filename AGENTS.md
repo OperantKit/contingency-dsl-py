@@ -19,6 +19,19 @@ To *run* a schedule (decide when a reinforcer is delivered), use contingency-py,
 - No runtime dependencies.
 - Parsed schedules run in contingency-py, so the timing code does not have to be written by hand. In schedule code that Claude Code (claude-opus-5-5) and Codex CLI (gpt-6.1-sol) wrote for 20 requests (one run each), VI intervals used Fleshler-Hoffman in 7 of 14 programs, 2 of 6 concurrent schedules had a COD error, and 2 of the 18 hand-written interval schedules could discard an available reinforcer or reinforce a response made before the interval had elapsed.
 
+## Why not a 50-line hand-written parser?
+
+A regular expression for `FR 5` or `VI 30-s` stops working as soon as an experiment needs more than one schedule:
+
+- **Full grammar.** Compound schedules (`Conc`, `Mult`, `Chain`, `Tand`, `Alt`, `Conj`, and others) nest arbitrarily, with changeover delay (`COD`, direction-specific `COD(1->2)`), fixed-ratio changeover (`FRCO`), limited hold, second-order schedules, parameter declarations, bindings, and respondent procedures.
+- **Conformance suite.** The tests replay more than 1,000 conformance cases from [contingency-dsl](https://github.com/OperantKit/contingency-dsl), and serialized ASTs are validated against its JSON Schema, so other parsers (including the Rust one in [contingency-rs](https://github.com/OperantKit/contingency-rs)) can be checked against the same cases.
+- **Round trip.** `parse` → `to_dict` → `from_dict` → `format_program` returns the canonical source text; the round trip is covered by tests.
+- **Method sections.** The AST dict is the input of [contingency-dsl2procedure](https://github.com/OperantKit/contingency-dsl2procedure), which writes the schedule as a Method-section paragraph, and [contingency-procedure2dsl](https://github.com/OperantKit/contingency-procedure2dsl) extracts schedules from published Method text.
+- **Annotations are validated.** `@reinforcer`, `@algorithm`, `@session_end`, and other keywords are checked by extension modules instead of being silently ignored.
+- **Errors carry positions.** Lexical and syntax errors report line and column.
+
+A parsed schedule can be run by [contingency-py](https://github.com/OperantKit/contingency-py) instead of hand-written timing code. When Claude Code (claude-opus-5-5) and Codex CLI (gpt-6.1-sol) wrote that code themselves for 20 schedule-programming requests (one run each), VI intervals used the Fleshler-Hoffman progression in 7 of 14 programs, 2 of 6 concurrent schedules had a changeover-delay error, and 2 of the 18 interval schedules written by hand could discard an available reinforcer or reinforce a response made before the interval had elapsed (details in the contingency-py README).
+
 ## Do not
 
 - Do not split schedule strings with regular expressions or string slicing; call `parse`.
