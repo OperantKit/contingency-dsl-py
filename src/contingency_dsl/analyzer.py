@@ -56,6 +56,7 @@ def analyze(program):
     - Repeat expanded to Tand
     - Same-combinator nesting flattened (Theorem 2: Associativity)
     - Program-level LH default applied
+    - Program-level BO default applied to every Mult/Mix without its own BO
     - Bindings cleared (no longer needed after expansion)
 
     For ``PhaseSequence`` inputs, the experiment-layer parser's
@@ -96,6 +97,10 @@ def analyze(program):
         for decl in program.param_decls:
             if decl.name == "LH":
                 schedule = _apply_lh_default(schedule, decl.value, decl.time_unit)
+            elif decl.name == "BO":
+                schedule = _apply_bo_default(
+                    schedule, CompoundParam(value=decl.value, time_unit=decl.time_unit)
+                )
             elif decl.name == "RD":
                 _validate_rd(decl, warns)
                 preserved_decls.append(decl)
@@ -1069,9 +1074,10 @@ def _validate_compound_params(expr: ScheduleExpr, warns: list[str]) -> None:
                             )
                         _validate_directional_cod(v, len(components), warns)
                     elif isinstance(v, CompoundParam):
-                        # COD=0 is explicitly valid (disables COD, per §7);
-                        # FRCO=0 / BO=0 are invalid (use omission instead).
-                        if v.value <= 0 and k not in ("COD",):
+                        # COD=0 (§7) and BO=0 (§13) are explicitly valid
+                        # (no changeover delay / no blackout); FRCO=0 is
+                        # invalid (use omission instead).
+                        if v.value <= 0 and k not in ("COD", "BO"):
                             raise SemanticError(
                                 f"{k}_NONPOSITIVE: {k}={v.value} must be positive"
                             )
@@ -1357,6 +1363,41 @@ def _flatten_associative(expr: ScheduleExpr) -> ScheduleExpr:
 
         case _:
             return expr
+
+
+def _apply_bo_default(node: object, bo: CompoundParam) -> object:
+    """Apply a program-level BO to every Mult/Mix that has no BO of its own.
+
+    Walks every AST dataclass so that a Mult/Mix nested under any other
+    node receives the default; nodes without a Mult/Mix are returned as is.
+    """
+    import dataclasses
+
+    if isinstance(node, (tuple, list)):
+        items = [_apply_bo_default(item, bo) for item in node]
+        if all(a is b for a, b in zip(items, node)):
+            return node
+        return tuple(items) if isinstance(node, tuple) else items
+    if isinstance(node, dict):
+        entries = {k: _apply_bo_default(v, bo) for k, v in node.items()}
+        if all(entries[k] is node[k] for k in node):
+            return node
+        return entries
+    if not dataclasses.is_dataclass(node) or isinstance(node, type):
+        return node
+    changes = {}
+    for f in dataclasses.fields(node):
+        old = getattr(node, f.name)
+        new = _apply_bo_default(old, bo)
+        if new is not old:
+            changes[f.name] = new
+    if (
+        isinstance(node, Compound)
+        and node.combinator in (Combinator.MULT, Combinator.MIX)
+        and not (node.params and "BO" in node.params)
+    ):
+        changes["params"] = {**(node.params or {}), "BO": bo}
+    return dataclasses.replace(node, **changes) if changes else node
 
 
 def _apply_lh_default(
