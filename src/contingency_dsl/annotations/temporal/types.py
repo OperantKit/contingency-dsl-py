@@ -8,9 +8,10 @@ References:
     Fleshler, M., & Hoffman, H. S. (1962). A progression for generating
         variable-interval schedules. Journal of the Experimental Analysis
         of Behavior, 5(4), 529-530. https://doi.org/10.1901/jeab.1962.5-529
-    Hantula, D. A. (1991). A progression for generating variable-interval
-        schedules. Journal of the Experimental Analysis of Behavior,
-        56(2), 391-392. https://doi.org/10.1901/jeab.1991.56-391
+    Hantula, D. A. (1991). A simple BASIC program to generate values for
+        variable-interval schedules of reinforcement. Journal of Applied
+        Behavior Analysis, 24(4), 799-801.
+        https://doi.org/10.1901/jaba.1991.24-799
 """
 from __future__ import annotations
 
