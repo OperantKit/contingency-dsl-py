@@ -7,7 +7,7 @@ contingency-dsl-py reads schedules of reinforcement and conditioning procedures 
 **In short**
 
 - Reads schedules from a simple `FR 5` to nested compound schedules with a changeover delay (COD), limited hold, second-order schedules, multi-phase designs, and respondent procedures.
-- Reports a mistake in a schedule with its line and column, so it is found when the file is read, not after the session.
+- Reports a syntax mistake with its line and column when the text is parsed, and `analyze` rejects values and names that the syntax allows but the language does not (such as `FR 0` or an undefined name), so both are found when the file is read, not after the session.
 - Needs nothing outside the Python standard library.
 
 ## Installation
@@ -39,6 +39,25 @@ except ParseError as error:
 
 The dictionary (the parsed form, or AST) is the format the other OperantKit packages exchange. `to_dict` and `from_dict` convert between it and the Python objects; `format_program` writes the canonical text.
 
+## Checking values and names
+
+`parse` checks syntax only. `FR 0`, `VI 0-s`, and a name that is never defined pass it; `analyze` checks values and names and raises `SemanticError`:
+
+```python
+from contingency_dsl import SemanticError, analyze, parse
+
+program = parse("FR 0")  # the syntax is fine
+try:
+    analyze(program)
+except SemanticError as error:
+    print(error)  # ATOMIC_NONPOSITIVE_VALUE: FR must have a positive value (got 0.0); use EXT for extinction
+
+result = analyze(parse("FI 30"))
+print([w.split(":")[0] for w in result.warnings])  # ['MISSING_TIME_UNIT']
+```
+
+Problems that do not stop a schedule from being read, such as a missing time unit, are returned in `warnings`.
+
 ## Annotations
 
 Annotations such as `@reinforcer("food")` or `@species("rat")` add Method-section details (subjects, apparatus, stimuli, measurement) to a schedule. They are checked by extension modules, so pass a registry that includes the ones you use:
@@ -58,7 +77,7 @@ Six extensions are included in `contingency_dsl.annotations`: `StimulusExtension
 
 - This package reads schedules; it does not run them. To decide when a reinforcer is delivered, use [contingency-py](https://github.com/OperantKit/contingency-py).
 - Annotated text without a registry fails with a syntax error at the `@` (for example `unexpected token after schedule: AT '@'`), not with a message about the missing extension.
-- Not every construct in the specification is read. The respondent annotations `@cs` and `@us` are not covered by the six included extensions, and the Pavlovian procedures of [contingency-respondent-dsl](https://github.com/OperantKit/contingency-respondent-dsl) (such as `Renewal(...)`) are not parsed.
+- Not every construct in the specification is read. The respondent annotations `@cs` and `@us` are not covered by the six included extensions, and the Pavlovian procedures of [contingency-respondent-dsl](https://github.com/OperantKit/contingency-respondent-dsl) (such as `Renewal(...)`) are not read: `parse` accepts `Renewal(ABA)` as a second-order schedule of two names, and `analyze` rejects it as an undefined identifier.
 
 ## For contributors
 

@@ -22,6 +22,8 @@ print(format_program(program))  # Conc(VI30s, VI60s, COD=2s)
 
 The import name is `contingency_dsl`. Annotations such as `@reinforcer("food")` or `@algorithm("fleshler-hoffman", seed=42)` require a registry: `parse(src, extensions=ExtensionRegistry.build(StimulusExtension(), TemporalExtension()))` (from `contingency_dsl.extensions` and `contingency_dsl.annotations`).
 
+`parse` checks syntax only. `analyze(program)` checks values and names: it raises `SemanticError` for `FR 0` or an undefined name, and returns warnings such as a missing time unit.
+
 ## Docs
 
 - [README](https://github.com/OperantKit/contingency-dsl-py/blob/main/README.md): install, example, why not to hand-roll a parser, annotation extensions

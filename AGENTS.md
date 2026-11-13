@@ -35,6 +35,7 @@ A parsed schedule can be run by [contingency-py](https://github.com/OperantKit/c
 ## Do not
 
 - Do not split schedule strings with regular expressions or string slicing; call `parse`.
+- Do not treat a successful `parse` as a valid schedule. `parse` checks syntax only; `FR 0` and undefined names pass it. Call `analyze` to raise `SemanticError` for them and to get warnings such as a missing time unit.
 - Do not build AST dicts by hand when you can parse source text; if you must, validate them with `from_dict`.
 - Do not pass annotated source without an extension registry; annotations then fail to parse.
 - Do not invent new keywords or schedule abbreviations. If the grammar lacks something, it belongs in the contingency-dsl specification first.

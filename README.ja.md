@@ -7,7 +7,7 @@ contingency-dsl-py は、[contingency-dsl](https://github.com/OperantKit/conting
 **要点**
 
 - 単純な `FR 5` から、切替遅延（changeover delay, COD）・制限時間（limited hold）つきの入れ子の複合スケジュール、二次スケジュール、複数フェーズのデザイン、レスポンデントの手続きまで読めます。
-- スケジュールの書き誤りを行と列つきで報告するので、セッションの後ではなくファイルを読んだ時点で見つかります。
+- 構文の誤りは構文解析の時点で行と列つきで報告し、構文としては通るが言語として誤りの値や名前（`FR 0`、定義されていない名前など）は `analyze` が見つけます。どちらもセッションの後ではなくファイルを読んだ時点で見つかります。
 - Python の標準ライブラリ以外は何も要りません。
 
 ## インストール
@@ -39,6 +39,25 @@ except ParseError as error:
 
 この辞書（構文解析の結果。AST とも呼びます）が、OperantKit のパッケージどうしがやり取りする形式です。`to_dict` と `from_dict` はこの辞書と Python のオブジェクトを相互に変換し、`format_program` は正規の形のテキストを書き出します。
 
+## 値と名前の検査
+
+`parse` が検査するのは構文だけです。`FR 0`・`VI 0-s`・どこにも定義されていない名前は `parse` を通ります。`analyze` は値と名前を検査し、`SemanticError` を出します。
+
+```python
+from contingency_dsl import SemanticError, analyze, parse
+
+program = parse("FR 0")  # 構文は正しい
+try:
+    analyze(program)
+except SemanticError as error:
+    print(error)  # ATOMIC_NONPOSITIVE_VALUE: FR must have a positive value (got 0.0); use EXT for extinction
+
+result = analyze(parse("FI 30"))
+print([w.split(":")[0] for w in result.warnings])  # ['MISSING_TIME_UNIT']
+```
+
+時間の単位が無いなど、スケジュールを読むのを妨げない問題は `warnings` に返ります。
+
 ## アノテーション
 
 `@reinforcer("food")` や `@species("rat")` のようなアノテーションは、スケジュールに Method 節の情報（被験体、装置、刺激、測定）を加えます。アノテーションは拡張モジュールが検査するので、使うものを含むレジストリを渡します。
@@ -58,7 +77,7 @@ program = parse('FR 5 @reinforcer("food")', extensions=registry)
 
 - このパッケージはスケジュールを読むだけで、実行はしません。強化子をいつ提示するかを決めるには [contingency-py](https://github.com/OperantKit/contingency-py) を使います。
 - アノテーションつきのテキストをレジストリなしで渡すと、拡張が無いという内容ではなく、`@` の位置の構文エラー（例: `unexpected token after schedule: AT '@'`）になります。
-- 仕様のすべての構文を読めるわけではありません。レスポンデント用のアノテーション `@cs` と `@us` は同梱の 6 つの拡張では扱えず、[contingency-respondent-dsl](https://github.com/OperantKit/contingency-respondent-dsl) の Pavlov 型の手続き（`Renewal(...)` など）は構文解析できません。
+- 仕様のすべての構文を読めるわけではありません。レスポンデント用のアノテーション `@cs` と `@us` は同梱の 6 つの拡張では扱えず、[contingency-respondent-dsl](https://github.com/OperantKit/contingency-respondent-dsl) の Pavlov 型の手続き（`Renewal(...)` など）は読めません。`parse` は `Renewal(ABA)` を名前 2 つの二次スケジュールとして受け付け、`analyze` が定義されていない名前として止めます。
 
 ## 開発に参加する人へ
 
