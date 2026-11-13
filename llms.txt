@@ -24,7 +24,7 @@ The import name is `contingency_dsl`. Annotations such as `@reinforcer("food")` 
 
 ## Docs
 
-- [README](https://github.com/OperantKit/contingency-dsl-py/blob/main/README.md): install, 30-second example, why not to hand-roll a parser, annotation extensions
+- [README](https://github.com/OperantKit/contingency-dsl-py/blob/main/README.md): install, example, why not to hand-roll a parser, annotation extensions
 - [AGENTS.md](https://github.com/OperantKit/contingency-dsl-py/blob/main/AGENTS.md): when to use this package and what not to do
 - [Language specification](https://github.com/OperantKit/contingency-dsl): grammar, AST schema, conformance cases
 
