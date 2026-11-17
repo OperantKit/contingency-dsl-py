@@ -2,12 +2,12 @@
 
 :gb: [English README](README.md)
 
-contingency-dsl-py は、[contingency-dsl](https://github.com/OperantKit/contingency-dsl) の記法（`Conc(VI 30-s, VI 60-s, COD=2-s)` など）で書かれた強化スケジュールと条件づけの手続きを読み、Python のオブジェクトや普通の辞書に変換します。contingency-dsl の Python のリファレンスパーサです。[OperantKit](https://github.com/OperantKit) の中では、[contingency-py](https://github.com/OperantKit/contingency-py) がこれで構文解析したスケジュールを実行し、[contingency-dsl2procedure](https://github.com/OperantKit/contingency-dsl2procedure) が構文解析の結果を方法セクション（Method 節）の文章にします。
+contingency-dsl-py は、[contingency-dsl](https://github.com/OperantKit/contingency-dsl) の記法 (`Conc(VI 30-s, VI 60-s, COD=2-s)` など) で書かれた強化スケジュールと条件づけの手続きを読み、Python のオブジェクトや普通の辞書に変換します。contingency-dsl の Python のリファレンスパーサです。[OperantKit](https://github.com/OperantKit) の中では、[contingency-py](https://github.com/OperantKit/contingency-py) がこれで構文解析したスケジュールを実行し、[contingency-dsl2procedure](https://github.com/OperantKit/contingency-dsl2procedure) が構文解析の結果を方法セクション (Method 節) の文章にします。
 
 **要点**
 
-- 単純な `FR 5` から、切替遅延（changeover delay, COD）・制限時間（limited hold）つきの入れ子の複合スケジュール、二次スケジュール、複数フェーズのデザイン、レスポンデントの手続きまで読めます。
-- 構文の誤りは構文解析の時点で行と列つきで報告し、構文としては通るが言語として誤りの値や名前（`FR 0`、定義されていない名前など）は `analyze` が見つけます。どちらもセッションの後ではなくファイルを読んだ時点で見つかります。
+- 単純な `FR 5` から、切り替え遅延 (changeover delay, COD)・制限時間 (limited hold) つきの入れ子の複合スケジュール、二次スケジュール、複数フェーズのデザイン、レスポンデントの手続きまで読めます。
+- 構文の誤りは構文解析の時点で行と列つきで報告し、構文としては通るが言語として誤りの値や名前 (`FR 0`、定義されていない名前など) は `analyze` が見つけます。どちらもセッションの後ではなくファイルを読んだ時点で見つかります。
 - Python の標準ライブラリ以外は何も要りません。
 
 ## インストール
@@ -37,7 +37,7 @@ except ParseError as error:
     print(error)  # line 1, col 12: unexpected end of input
 ```
 
-この辞書（構文解析の結果。AST とも呼びます）が、OperantKit のパッケージどうしがやり取りする形式です。`to_dict` と `from_dict` はこの辞書と Python のオブジェクトを相互に変換し、`format_program` は正規の形のテキストを書き出します。
+この辞書 (構文解析の結果。AST とも呼びます) が、OperantKit のパッケージどうしがやり取りする形式です。`to_dict` と `from_dict` はこの辞書と Python のオブジェクトを相互に変換し、`format_program` は正規の形のテキストを書き出します。
 
 ## 値と名前の検査
 
@@ -60,7 +60,7 @@ print([w.split(":")[0] for w in result.warnings])  # ['MISSING_TIME_UNIT']
 
 ## アノテーション
 
-`@reinforcer("food")` や `@species("rat")` のようなアノテーションは、スケジュールに Method 節の情報（被験体、装置、刺激、測定）を加えます。アノテーションは拡張モジュールが検査するので、使うものを含むレジストリを渡します。
+`@reinforcer("food")` や `@species("rat")` のようなアノテーションは、スケジュールに Method 節の情報 (被験体、装置、刺激、測定) を加えます。アノテーションは拡張モジュールが検査するので、使うものを含むレジストリを渡します。
 
 ```python
 from contingency_dsl import parse
@@ -76,8 +76,8 @@ program = parse('FR 5 @reinforcer("food")', extensions=registry)
 ## 制限
 
 - このパッケージはスケジュールを読むだけで、実行はしません。強化子をいつ提示するかを決めるには [contingency-py](https://github.com/OperantKit/contingency-py) を使います。
-- アノテーションつきのテキストをレジストリなしで渡すと、拡張が無いという内容ではなく、`@` の位置の構文エラー（例: `unexpected token after schedule: AT '@'`）になります。
-- 仕様のすべての構文を読めるわけではありません。レスポンデント用のアノテーション `@cs` と `@us` は同梱の 6 つの拡張では扱えず、[contingency-respondent-dsl](https://github.com/OperantKit/contingency-respondent-dsl) の Pavlov 型の手続き（`Renewal(...)` など）は読めません。`parse` は `Renewal(ABA)` を名前 2 つの二次スケジュールとして受け付け、`analyze` が定義されていない名前として止めます。
+- アノテーションつきのテキストをレジストリなしで渡すと、拡張が無いという内容ではなく、`@` の位置の構文エラー (例: `unexpected token after schedule: AT '@'`) になります。
+- 仕様のすべての構文を読めるわけではありません。レスポンデント用のアノテーション `@cs` と `@us` は同梱の 6 つの拡張では扱えず、[contingency-respondent-dsl](https://github.com/OperantKit/contingency-respondent-dsl) の Pavlov 型の手続き (`Renewal(...)` など) は読めません。`parse` は `Renewal(ABA)` を名前 2 つの二次スケジュールとして受け付け、`analyze` が定義されていない名前として止めます。
 
 ## 開発に参加する人へ
 
